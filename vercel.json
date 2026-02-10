@@ -22,10 +22,5 @@
             "src": "/(.*)",
             "dest": "/$1"
         }
-    ],
-    "env": {
-        "TELEGRAM_BOT_TOKEN": "@telegram_bot_token",
-        "TWITTER_CLIENT_ID": "@twitter_client_id",
-        "TWITTER_CLIENT_SECRET": "@twitter_client_secret"
-    }
+    ]
 }
