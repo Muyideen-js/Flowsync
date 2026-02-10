@@ -7,22 +7,21 @@ import RotatingText from '../../components/RotatingText/RotatingText';
 import './Landing.css';
 
 const Landing = () => {
-    const [typedText, setTypedText] = useState('');
     const [selectedLang, setSelectedLang] = useState('nodejs');
     const fullText = 'Automate Social Media with AI';
 
     useEffect(() => {
         let index = 0;
-        const timer = setInterval(() => {
-            if (index <= fullText.length) {
-                setTypedText(fullText.slice(0, index));
+        const interval = setInterval(() => {
+            if (index < fullText.length) {
                 index++;
             } else {
-                clearInterval(timer);
+                clearInterval(interval);
             }
-        }, 70);
-        return () => clearInterval(timer);
-    }, []);
+        }, 100);
+
+        return () => clearInterval(interval);
+    }, [fullText]);
 
     return (
         <div className="landing">
