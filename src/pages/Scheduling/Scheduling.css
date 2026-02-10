@@ -1,0 +1,187 @@
+.scheduling-layout {
+    display: flex;
+    min-height: 100vh;
+    background: #0a0a0a;
+}
+
+.scheduling-main {
+    flex: 1;
+    margin-left: 250px;
+    padding: 60px 40px;
+}
+
+/* Header */
+.scheduling-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 48px;
+}
+
+.scheduling-header h1 {
+    font-size: 2rem;
+    font-weight: 800;
+    color: white;
+    margin: 0 0 4px 0;
+}
+
+.scheduling-header p {
+    font-size: 0.875rem;
+    color: rgba(255, 255, 255, 0.5);
+    margin: 0;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+/* View Tabs */
+.view-tabs {
+    display: flex;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 4px;
+}
+
+.view-tab {
+    padding: 6px 16px;
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.6);
+    font-family: var(--font-family);
+    font-size: 0.813rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    text-transform: capitalize;
+}
+
+.view-tab:hover {
+    color: white;
+}
+
+.view-tab.active {
+    background: rgba(0, 201, 58, 0.1);
+    color: #00c93a;
+}
+
+/* Posts List */
+.posts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.post-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.post-main {
+    flex: 1;
+}
+
+.post-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.post-platform {
+    font-size: 0.688rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    background: rgba(0, 201, 58, 0.1);
+    color: #00c93a;
+    border-radius: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.post-status {
+    font-size: 0.688rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+    text-transform: capitalize;
+}
+
+.post-status.scheduled {
+    background: rgba(0, 136, 204, 0.1);
+    color: #0088cc;
+}
+
+.post-status.queued {
+    background: rgba(255, 193, 7, 0.1);
+    color: #ffc107;
+}
+
+.post-status.draft {
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.post-content {
+    font-size: 0.875rem;
+    color: white;
+    margin: 0 0 12px 0;
+    line-height: 1.5;
+}
+
+.post-schedule {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 0.75rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.post-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+    .scheduling-main {
+        margin-left: 80px;
+    }
+}
+
+@media (max-width: 768px) {
+    .scheduling-main {
+        margin-left: 0;
+        padding: 40px 20px;
+    }
+
+    .scheduling-header {
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .header-actions {
+        width: 100%;
+        flex-direction: column;
+    }
+
+    .view-tabs {
+        width: 100%;
+    }
+
+    .post-item {
+        flex-direction: column;
+    }
+
+    .post-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
+}
