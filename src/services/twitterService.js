@@ -38,4 +38,5 @@ class TwitterService {
     }
 }
 
-export default new TwitterService();
+const twitterService = new TwitterService();
+export default twitterService;

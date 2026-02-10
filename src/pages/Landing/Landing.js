@@ -477,14 +477,14 @@ const Landing = () => {
                                     <span className="code-property">apiKey</span>: process.env.<span className="code-property">SOCIALFLOW_API_KEY</span>
                                     {'}'});
                                     {'\n'}
-                                    <span className="code-comment">// Send automated reply</span>
+                                    <span className="code-comment">{'//'} Send automated reply</span>
                                     {'\n'}<span className="code-keyword">await</span> client.messages.<span className="code-function">reply</span>({'{'}
                                     <span className="code-property">platform</span>: <span className="code-string">'twitter'</span>,
                                     <span className="code-property">messageId</span>: <span className="code-string">'msg_123'</span>,
                                     <span className="code-property">content</span>: <span className="code-string">'Thanks for reaching out!'</span>
                                     {'}'});
                                     {'\n'}
-                                    <span className="code-comment">// Create automation rule</span>
+                                    <span className="code-comment">{'//'} Create automation rule</span>
                                     {'\n'}<span className="code-keyword">await</span> client.automations.<span className="code-function">create</span>({'{'}
                                     <span className="code-property">trigger</span>: <span className="code-string">'new_mention'</span>,
                                     <span className="code-property">action</span>: <span className="code-string">'ai_draft_reply'</span>,
@@ -527,14 +527,14 @@ const Landing = () => {
                                     os.<span className="code-function">Getenv</span>(<span className="code-string">"SOCIALFLOW_API_KEY"</span>),
                                     )
                                     {'\n'}
-                                    <span className="code-comment">// Send automated reply</span>
+                                    <span className="code-comment">{'//'} Send automated reply</span>
                                     {'\n'}    client.Messages.<span className="code-function">Reply</span>(&socialflow.ReplyParams{'{'}
                                     <span className="code-property">Platform</span>:  <span className="code-string">"twitter"</span>,
                                     <span className="code-property">MessageID</span>: <span className="code-string">"msg_123"</span>,
                                     <span className="code-property">Content</span>:   <span className="code-string">"Thanks for reaching out!"</span>,
                                     {'}'})
                                     {'\n'}
-                                    <span className="code-comment">// Create automation rule</span>
+                                    <span className="code-comment">{'//'} Create automation rule</span>
                                     {'\n'}    client.Automations.<span className="code-function">Create</span>(&socialflow.AutomationParams{'{'}
                                     <span className="code-property">Trigger</span>:   <span className="code-string">"new_mention"</span>,
                                     <span className="code-property">Action</span>:    <span className="code-string">"ai_draft_reply"</span>,

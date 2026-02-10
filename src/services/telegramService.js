@@ -38,4 +38,5 @@ class TelegramService {
     }
 }
 
-export default new TelegramService();
+const telegramService = new TelegramService();
+export default telegramService;
