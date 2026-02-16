@@ -1,0 +1,18 @@
+import React from 'react';
+import Sidebar from '../Sidebar/Sidebar';
+import TopBar from '../TopBar/TopBar';
+import './MainLayout.css';
+
+const MainLayout = ({ children }) => {
+    return (
+        <div className="main-layout">
+            <Sidebar />
+            <TopBar />
+            <main className="main-content">
+                {children}
+            </main>
+        </div>
+    );
+};
+
+export default MainLayout;

@@ -1,0 +1,22 @@
+.main-layout {
+    display: flex;
+    min-height: 100vh;
+    background: var(--bg-primary);
+}
+
+.main-content {
+    margin-left: var(--sidebar-width);
+    margin-top: var(--topbar-height);
+    flex: 1;
+    padding: var(--space-xl);
+    min-height: calc(100vh - var(--topbar-height));
+    overflow-y: auto;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .main-content {
+        margin-left: 56px;
+        padding: var(--space-lg);
+    }
+}

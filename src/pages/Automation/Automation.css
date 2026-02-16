@@ -1,168 +1,321 @@
-.automation-layout {
-    display: flex;
-    min-height: 100vh;
-    background: #0a0a0a;
+/* ───────────────────────────────────────────
+   AUTOMATION PAGE
+   ─────────────────────────────────────────── */
+
+.anim-au {
+    opacity: 0;
+    transform: translateY(16px);
+    transition:
+        opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: calc(var(--i, 0) * 0.08s);
 }
 
-.automation-main {
-    flex: 1;
-    margin-left: 250px;
-    padding: 60px 40px;
+.auto.loaded .anim-au {
+    opacity: 1;
+    transform: translateY(0);
 }
 
-/* Header */
-.automation-header {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    margin-bottom: 48px;
-}
-
-.automation-header h1 {
-    font-size: 2rem;
-    font-weight: 800;
-    color: white;
-    margin: 0 0 4px 0;
-}
-
-.automation-header p {
-    font-size: 0.875rem;
-    color: rgba(255, 255, 255, 0.5);
-    margin: 0;
-}
-
-/* Rules List */
-.rules-list {
+.auto {
+    max-width: 900px;
+    margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 12px;
-}
-
-.rule-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
     gap: 24px;
-    padding: 24px;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.rule-main {
-    flex: 1;
-}
+/* ── Header ───────────────────────────────── */
 
-.rule-header {
+.au-head {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 12px;
 }
 
-.rule-header h3 {
-    font-size: 0.938rem;
+.au-head h1 {
+    font-size: 22px;
     font-weight: 700;
-    color: white;
+    color: #f5f5f5;
+    letter-spacing: -0.03em;
+    margin: 0 0 4px;
+}
+
+.au-head p {
+    font-size: 13.5px;
+    color: rgba(255, 255, 255, 0.45);
     margin: 0;
 }
 
-/* Toggle Switch */
-.toggle-switch {
-    position: relative;
-    display: inline-block;
-    width: 44px;
-    height: 24px;
-    cursor: pointer;
-}
-
-.toggle-switch input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-}
-
-.toggle-slider {
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(255, 255, 255, 0.1);
-    transition: 0.3s;
-    border-radius: 24px;
-}
-
-.toggle-slider:before {
-    position: absolute;
-    content: "";
-    height: 18px;
-    width: 18px;
-    left: 3px;
-    bottom: 3px;
-    background: white;
-    transition: 0.3s;
-    border-radius: 50%;
-}
-
-.toggle-switch input:checked+.toggle-slider {
-    background: #00c93a;
-}
-
-.toggle-switch input:checked+.toggle-slider:before {
-    transform: translateX(20px);
-}
-
-/* Rule Flow */
-.rule-flow {
+.au-new-btn {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 6px;
+    padding: 8px 16px;
+    border-radius: 8px;
+    background: var(--accent);
+    border: none;
+    color: #000;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
 }
 
-.flow-step {
-    font-size: 0.813rem;
-    color: rgba(255, 255, 255, 0.7);
+.au-new-btn:hover {
+    filter: brightness(1.15);
+    transform: translateY(-1px);
 }
 
-.flow-arrow {
-    color: #00c93a;
-    font-size: 1rem;
-}
+/* ── Stats strip ──────────────────────────── */
 
-.rule-actions {
+.au-stats {
     display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    padding: 18px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+}
+
+.au-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.au-stat-val {
+    font-size: 20px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.03em;
+}
+
+.au-stat-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.35);
+}
+
+.au-stat-div {
+    width: 1px;
+    height: 32px;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Rules list ───────────────────────────── */
+
+.au-list {
+    display: flex;
+    flex-direction: column;
     gap: 8px;
 }
 
-/* Responsive */
-@media (max-width: 1024px) {
-    .automation-main {
-        margin-left: 80px;
-    }
+.au-rule {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 20px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    gap: 16px;
 }
 
-@media (max-width: 768px) {
-    .automation-main {
-        margin-left: 0;
-        padding: 40px 20px;
+.au-rule:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    transform: translateX(3px);
+}
+
+.au-rule.disabled {
+    opacity: 0.5;
+}
+
+.au-rule.disabled:hover {
+    opacity: 0.75;
+}
+
+.au-rule-left {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    flex: 1;
+    min-width: 0;
+}
+
+.au-rule-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: rgba(138, 43, 226, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #b78aff;
+    flex-shrink: 0;
+}
+
+.au-rule-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.au-rule-top {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.au-rule-top h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #eee;
+    margin: 0;
+}
+
+.au-rule-runs {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.04);
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+/* Flow tags */
+.au-rule-flow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.au-flow-tag {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11.5px;
+    font-weight: 500;
+    padding: 3px 10px;
+    border-radius: 6px;
+}
+
+.au-flow-tag.trigger {
+    background: rgba(29, 161, 242, 0.08);
+    border: 1px solid rgba(29, 161, 242, 0.15);
+    color: #5bb8f5;
+}
+
+.au-flow-tag.action {
+    background: rgba(0, 201, 58, 0.08);
+    border: 1px solid rgba(0, 201, 58, 0.15);
+    color: var(--accent-light);
+}
+
+.au-flow-arrow {
+    color: rgba(255, 255, 255, 0.2);
+    font-size: 13px;
+}
+
+/* Right side */
+.au-rule-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+}
+
+.au-edit {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 5px 14px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    opacity: 0;
+}
+
+.au-rule:hover .au-edit {
+    opacity: 1;
+}
+
+.au-edit:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+/* Toggle switch */
+.au-toggle {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.au-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+
+.au-toggle-track {
+    position: absolute;
+    inset: 0;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    transition: background 0.2s ease;
+}
+
+.au-toggle-track::after {
+    content: '';
+    position: absolute;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #fff;
+    top: 3px;
+    left: 3px;
+    transition: transform 0.2s ease;
+}
+
+.au-toggle input:checked+.au-toggle-track {
+    background: var(--accent);
+}
+
+.au-toggle input:checked+.au-toggle-track::after {
+    transform: translateX(16px);
+}
+
+/* ── Responsive ───────────────────────────── */
+
+@media (max-width: 640px) {
+    .au-head {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
     }
 
-    .rule-item {
+    .au-rule {
         flex-direction: column;
         align-items: flex-start;
     }
 
-    .rule-header {
+    .au-rule-right {
         width: 100%;
+        justify-content: space-between;
     }
 
-    .rule-flow {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 8px;
-    }
-
-    .flow-arrow {
-        transform: rotate(90deg);
+    .au-edit {
+        opacity: 1;
     }
 }

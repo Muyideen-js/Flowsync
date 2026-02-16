@@ -1,0 +1,351 @@
+/* ───────────────────────────────────────────
+   ACCOUNTS PAGE — clean, modern, animated
+   ─────────────────────────────────────────── */
+
+/* ── Stagger entrance ─────────────────────── */
+
+.anim-i {
+    opacity: 0;
+    transform: translateY(16px);
+    transition:
+        opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: calc(var(--i, 0) * 0.08s);
+}
+
+.acc.loaded .anim-i {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* ── Container ────────────────────────────── */
+
+.acc {
+    max-width: 1200px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+}
+
+/* ── Header ───────────────────────────────── */
+
+.acc-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.acc-head h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #f5f5f5;
+    letter-spacing: -0.03em;
+    margin: 0 0 4px;
+}
+
+.acc-head p {
+    font-size: 13.5px;
+    color: rgba(255, 255, 255, 0.45);
+    margin: 0;
+}
+
+.acc-counter {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 2px;
+}
+
+.acc-count {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--accent-light);
+    letter-spacing: -0.04em;
+    line-height: 1;
+}
+
+.acc-count-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.35);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* ── Cards grid ───────────────────────────── */
+
+.acc-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 14px;
+}
+
+/* ── Single card ──────────────────────────── */
+
+.acc-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 14px;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    transition: all 0.2s ease;
+}
+
+.acc-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+}
+
+/* ── Top row: icon + status ───────────────── */
+
+.ac-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ac-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--brand) 10%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.acc-card:hover .ac-icon {
+    background: color-mix(in srgb, var(--brand) 16%, transparent);
+    transform: scale(1.05);
+}
+
+.ac-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 4px 10px;
+    border-radius: 100px;
+}
+
+.ac-status.on {
+    color: var(--accent-light);
+    background: rgba(0, 201, 58, 0.1);
+}
+
+.ac-status.off {
+    color: rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.ac-status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+
+.ac-status.on .ac-status-dot {
+    background: var(--accent-light);
+    box-shadow: 0 0 6px var(--accent);
+    animation: dot-pulse 2.5s ease-in-out infinite;
+}
+
+.ac-status.off .ac-status-dot {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+@keyframes dot-pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+    }
+
+    50% {
+        opacity: 0.4;
+    }
+}
+
+/* ── Info ──────────────────────────────────── */
+
+.ac-info h3 {
+    font-size: 16px;
+    font-weight: 650;
+    color: #f0f0f0;
+    margin: 0 0 2px;
+    letter-spacing: -0.02em;
+}
+
+.ac-handle {
+    font-size: 12.5px;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+/* ── Stats row ────────────────────────────── */
+
+.ac-stats {
+    display: flex;
+    gap: 16px;
+    padding: 12px 14px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+}
+
+.ac-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+}
+
+.ac-stat-val {
+    font-size: 15px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.2;
+}
+
+.ac-stat-key {
+    font-size: 10.5px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.35);
+    text-transform: capitalize;
+}
+
+/* ── Actions row ──────────────────────────── */
+
+.ac-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.ac-btn {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 7px 16px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.ac-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+.ac-btn.danger {
+    color: rgba(255, 68, 68, 0.7);
+}
+
+.ac-btn.danger:hover {
+    background: rgba(255, 68, 68, 0.1);
+    border-color: rgba(255, 68, 68, 0.2);
+    color: #ff6b6b;
+}
+
+/* ── Benefits list (disconnected) ─────────── */
+
+.ac-benefits {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ac-benefits li {
+    font-size: 12.5px;
+    color: rgba(255, 255, 255, 0.4);
+    padding-left: 18px;
+    position: relative;
+    line-height: 1.4;
+}
+
+.ac-benefits li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: rgba(255, 255, 255, 0.2);
+    font-size: 11px;
+}
+
+/* ── Connect button ───────────────────────── */
+
+.ac-connect {
+    width: 100%;
+    padding: 10px;
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--brand) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--brand) 22%, transparent);
+    color: var(--brand);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.ac-connect:hover {
+    background: color-mix(in srgb, var(--brand) 20%, transparent);
+    border-color: color-mix(in srgb, var(--brand) 35%, transparent);
+    transform: translateY(-1px);
+}
+
+/* ── Info banner ──────────────────────────── */
+
+.acc-banner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 16px 20px;
+    background: rgba(29, 161, 242, 0.06);
+    border: 1px solid rgba(29, 161, 242, 0.12);
+    border-radius: 12px;
+}
+
+.ab-icon {
+    display: flex;
+    color: #5bb8f5;
+    flex-shrink: 0;
+}
+
+.ab-text {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.6);
+    line-height: 1.5;
+}
+
+.ab-text strong {
+    color: #fff;
+}
+
+/* ── Responsive ───────────────────────────── */
+
+@media (max-width: 900px) {
+    .acc-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 640px) {
+    .acc-head {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .acc-counter {
+        align-items: flex-start;
+    }
+}

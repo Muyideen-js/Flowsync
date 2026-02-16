@@ -1,0 +1,250 @@
+/* ───────────────────────────────────────────
+   MENTIONS PAGE
+   ─────────────────────────────────────────── */
+
+.anim-mn {
+    opacity: 0;
+    transform: translateY(16px);
+    transition:
+        opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: calc(var(--i, 0) * 0.08s);
+}
+
+.mentions.loaded .anim-mn {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.mentions {
+    max-width: 800px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+/* ── Header ───────────────────────────────── */
+
+.mn-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.mn-head h1 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #f5f5f5;
+    letter-spacing: -0.03em;
+    margin: 0 0 4px;
+}
+
+.mn-head p {
+    font-size: 13.5px;
+    color: rgba(255, 255, 255, 0.45);
+    margin: 0;
+}
+
+.mn-badge-count {
+    font-size: 12px;
+    font-weight: 600;
+    color: #ffa64d;
+    background: rgba(255, 166, 77, 0.1);
+    border: 1px solid rgba(255, 166, 77, 0.2);
+    padding: 5px 14px;
+    border-radius: 100px;
+}
+
+/* ── Tabs ──────────────────────────────────── */
+
+.mn-tabs {
+    display: flex;
+    gap: 4px;
+}
+
+.mn-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 18px;
+    border-radius: 100px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.45);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.mn-tab:hover {
+    color: rgba(255, 255, 255, 0.7);
+    border-color: rgba(255, 255, 255, 0.1);
+}
+
+.mn-tab.active {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font-weight: 600;
+}
+
+.mn-tab-count {
+    font-size: 10.5px;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.06);
+    padding: 1px 7px;
+    border-radius: 100px;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.mn-tab.active .mn-tab-count {
+    background: rgba(0, 201, 58, 0.12);
+    color: var(--accent-light);
+}
+
+/* ── Mention cards ────────────────────────── */
+
+.mn-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.mn-card {
+    display: flex;
+    gap: 14px;
+    padding: 18px 20px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 12px;
+    transition: all 0.2s ease;
+}
+
+.mn-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+    transform: translateX(3px);
+}
+
+.mn-card.replied {
+    opacity: 0.65;
+}
+
+.mn-card.replied:hover {
+    opacity: 1;
+}
+
+/* Avatar */
+.mn-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.6);
+    flex-shrink: 0;
+}
+
+/* Body */
+.mn-card-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.mn-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+
+.mn-user {
+    font-size: 13px;
+    font-weight: 650;
+    color: #eee;
+}
+
+.mn-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.mn-platform {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 3px;
+    background: color-mix(in srgb, var(--ch) 12%, transparent);
+    color: var(--ch);
+}
+
+.mn-time {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.25);
+}
+
+.mn-text {
+    font-size: 13.5px;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.5;
+    margin: 0 0 10px;
+}
+
+/* Actions */
+.mn-card-actions {
+    display: flex;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+}
+
+.mn-card:hover .mn-card-actions {
+    opacity: 1;
+}
+
+.mn-action {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+
+.mn-action:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+/* ── Responsive ───────────────────────────── */
+
+@media (max-width: 640px) {
+    .mn-head {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .mn-card-actions {
+        opacity: 1;
+    }
+
+    .mn-card-top {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+}
