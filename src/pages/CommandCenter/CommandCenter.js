@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import MainLayout from '../../components/Layout/MainLayout';
 import './CommandCenter.css';
 
-/* ── Tiny inline icons for this page only ── */
+/* ── Inline icons ── */
 const Ic = {
     check: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M13 4L6.5 11 3 7.5" /></svg>,
     dollar: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M8 1v14M11.5 4H6.25a2.25 2.25 0 000 4.5h3.5a2.25 2.25 0 010 4.5H4" /></svg>,
@@ -14,16 +14,16 @@ const Ic = {
     plus: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M8 3v10M3 8h10" /></svg>,
     msg: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 10a1.5 1.5 0 01-1.5 1.5H5L2 14.5v-11A1.5 1.5 0 013.5 2h9A1.5 1.5 0 0114 3.5V10z" /></svg>,
     zap: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 1L2 9h5.5L7 15l7-8H8.5L8.5 1z" /></svg>,
-    logout: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 14H3.5A1.5 1.5 0 012 12.5v-9A1.5 1.5 0 013.5 2H6" /><path d="M10.5 11.5L14 8l-3.5-3.5" /><path d="M14 8H6" /></svg>,
+    arrow: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M3 8h10M9 4l4 4-4 4" /></svg>,
+    calendar: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><rect x="2" y="3" width="12" height="11" rx="1.5" /><path d="M2 6.5h12" /><path d="M5.5 1.5v3M10.5 1.5v3" /></svg>,
+    broadcast: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><circle cx="8" cy="8" r="2" /><path d="M4.5 4.5a5 5 0 000 7" /><path d="M11.5 4.5a5 5 0 010 7" /></svg>,
 };
 
 const CommandCenter = () => {
     const [loaded, setLoaded] = useState(false);
-    const { user, logout } = useAuth();
-    const navigate = useNavigate();
+    const { user } = useAuth();
 
     useEffect(() => {
-        // trigger stagger animation on mount
         requestAnimationFrame(() => setLoaded(true));
     }, []);
 
@@ -36,24 +36,20 @@ const CommandCenter = () => {
 
     const displayName = user?.displayName || user?.email?.split('@')[0] || 'User';
 
-    const handleLogout = async () => {
-        await logout();
-        navigate('/login');
-    };
-
-    const todaysPlan = [
-        { id: 1, task: "Post 1 Reel on Instagram at 7:30 PM", channel: "instagram", priority: "high", done: false },
-        { id: 2, task: "Reply to 12 comments on Instagram", channel: "instagram", priority: "high", done: false },
-        { id: 3, task: "Respond to 4 DMs on WhatsApp", channel: "whatsapp", priority: "medium", done: true },
-        { id: 4, task: "Reply to 3 mentions on X", channel: "twitter", priority: "medium", done: false },
-        { id: 5, task: "Schedule 2 tweets for tomorrow", channel: "twitter", priority: "low", done: false },
+    /* ── Data ── */
+    const kpis = [
+        { title: 'Total Audience', value: '47,234', change: '+2,134', sub: 'this week', up: true, color: '#00c93a' },
+        { title: 'Engagement', value: '8.7%', change: '+1.2%', sub: 'vs last week', up: true, color: '#818cf8' },
+        { title: 'Inbox', value: '23', change: 'unread', sub: 'messages', up: false, color: '#f59e0b' },
+        { title: 'Queued', value: '12', change: 'posts', sub: 'next 24h', up: true, color: '#a855f7' },
     ];
 
-    const kpis = [
-        { title: "Total Audience", value: "47,234", change: "+2,134", sub: "this week", up: true },
-        { title: "Engagement", value: "8.7%", change: "+1.2%", sub: "vs last week", up: true },
-        { title: "Inbox", value: "23", change: "unread", sub: "messages", up: false },
-        { title: "Queued", value: "12", change: "posts", sub: "next 24h", up: true },
+    const todaysPlan = [
+        { id: 1, task: 'Post 1 Reel on Instagram at 7:30 PM', channel: 'instagram', priority: 'high', done: false },
+        { id: 2, task: 'Reply to 12 comments on Instagram', channel: 'instagram', priority: 'high', done: false },
+        { id: 3, task: 'Respond to 4 DMs on WhatsApp', channel: 'whatsapp', priority: 'medium', done: true },
+        { id: 4, task: 'Reply to 3 mentions on X', channel: 'twitter', priority: 'medium', done: false },
+        { id: 5, task: 'Schedule 2 tweets for tomorrow', channel: 'twitter', priority: 'low', done: false },
     ];
 
     const signals = [
@@ -87,148 +83,162 @@ const CommandCenter = () => {
         },
     ];
 
-    const progress = todaysPlan.filter(i => i.done).length / todaysPlan.length * 100;
+    const doneCount = todaysPlan.filter(i => i.done).length;
+    const progress = (doneCount / todaysPlan.length) * 100;
     const circumference = 2 * Math.PI * 18;
 
     return (
         <MainLayout>
-            <div className={`overview ${loaded ? 'loaded' : ''} `}>
-                {/* ── Greeting ── */}
-                <div className="ov-greeting anim-item" style={{ '--i': 0 }}>
-                    <div className="greeting-top">
-                        <div>
-                            <h1>{getGreeting()}, {displayName}</h1>
-                            <p>Here's what's happening across your channels today.</p>
-                        </div>
-                        <button className="logout-btn" onClick={handleLogout} title="Sign out">
-                            {Ic.logout}
-                            <span>Sign out</span>
-                        </button>
-                    </div>
-                </div>
+            <div className={`cc ${loaded ? 'loaded' : ''}`}>
+                {/* ── Ambient orbs ── */}
+                <div className="cc-orb cc-orb-1" />
+                <div className="cc-orb cc-orb-2" />
 
-                {/* ── KPI strip ── */}
-                <div className="ov-kpis anim-item" style={{ '--i': 1 }}>
-                    {kpis.map((k, idx) => (
-                        <div key={idx} className="kpi">
-                            <span className="kpi-label">{k.title}</span>
-                            <span className="kpi-val">{k.value}</span>
-                            <span className={`kpi - delta ${k.up ? 'up' : 'down'} `}>
-                                {k.up ? '↑' : '•'} {k.change} <span className="kpi-sub">{k.sub}</span>
-                            </span>
+                {/* ── Greeting ── */}
+                <section className="cc-hero cc-anim" style={{ '--i': 0 }}>
+                    <span className="cc-tag">Overview</span>
+                    <h1 className="cc-title">
+                        {getGreeting()}, <span className="cc-name">{displayName}</span>
+                    </h1>
+                    <p className="cc-subtitle">Here's what's happening across your channels today.</p>
+                </section>
+
+                {/* ── KPI Cards ── */}
+                <div className="cc-kpis">
+                    {kpis.map((k, i) => (
+                        <div key={i} className="cc-kpi cc-anim" style={{ '--i': i + 1, '--kpi-color': k.color }}>
+                            <div className="cc-kpi-glow" />
+                            <span className="cc-kpi-label">{k.title}</span>
+                            <span className="cc-kpi-value">{k.value}</span>
+                            <div className="cc-kpi-delta">
+                                <span className={`cc-kpi-change ${k.up ? 'up' : 'neutral'}`}>
+                                    {k.up ? '↑' : '•'} {k.change}
+                                </span>
+                                <span className="cc-kpi-sub">{k.sub}</span>
+                            </div>
                         </div>
                     ))}
                 </div>
 
-                {/* ── Two-column layout ── */}
-                <div className="ov-columns">
-                    {/* Left: Plan */}
-                    <div className="ov-plan anim-item" style={{ '--i': 2 }}>
-                        <div className="plan-head">
+                {/* ── Main grid ── */}
+                <div className="cc-grid">
+                    {/* ── Today's Plan ── */}
+                    <div className="cc-card cc-plan cc-anim" style={{ '--i': 5 }}>
+                        <div className="cc-card-head">
                             <div>
                                 <h2>Today's Plan</h2>
-                                <span className="plan-sub">{todaysPlan.filter(i => i.done).length} of {todaysPlan.length} done</span>
+                                <span className="cc-card-sub">{doneCount} of {todaysPlan.length} done</span>
                             </div>
-                            <svg className="plan-ring" width="44" height="44" viewBox="0 0 44 44">
-                                <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="3" />
+                            <svg className="cc-ring" width="48" height="48" viewBox="0 0 44 44">
+                                <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3.5" />
                                 <circle
                                     cx="22" cy="22" r="18" fill="none"
-                                    stroke="var(--accent)" strokeWidth="3"
+                                    stroke="#00c93a" strokeWidth="3.5"
                                     strokeDasharray={circumference}
                                     strokeDashoffset={circumference * (1 - progress / 100)}
                                     strokeLinecap="round"
-                                    style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%', transition: 'stroke-dashoffset 1s cubic-bezier(0.16,1,0.3,1)' }}
+                                    style={{ transform: 'rotate(-90deg)', transformOrigin: '50% 50%', transition: 'stroke-dashoffset 1.2s cubic-bezier(0.16,1,0.3,1)' }}
                                 />
-                                <text x="22" y="26" textAnchor="middle" fontSize="11" fontWeight="700" fill="#fff">{Math.round(progress)}%</text>
+                                <text x="22" y="26" textAnchor="middle" fontSize="11" fontWeight="800" fill="#fff">{Math.round(progress)}%</text>
                             </svg>
                         </div>
-                        <div className="plan-list">
-                            {todaysPlan.map((item, idx) => (
-                                <div key={item.id} className={`plan - row ${item.done ? 'done' : ''} `} style={{ '--j': idx }}>
-                                    <div className={`plan - check ${item.done ? 'checked' : ''} `}>
+                        <div className="cc-plan-list">
+                            {todaysPlan.map((item) => (
+                                <div key={item.id} className={`cc-plan-row ${item.done ? 'done' : ''}`}>
+                                    <div className={`cc-plan-check ${item.done ? 'checked' : ''}`}>
                                         {item.done && Ic.check}
                                     </div>
-                                    <div className="plan-info">
+                                    <div className="cc-plan-info">
                                         <p>{item.task}</p>
-                                        <div className="plan-tags">
-                                            <span className={`tag - priority ${item.priority} `}>{item.priority}</span>
-                                            <span className={`tag - channel ${item.channel} `}>{item.channel}</span>
+                                        <div className="cc-plan-tags">
+                                            <span className={`cc-ptag priority-${item.priority}`}>{item.priority}</span>
+                                            <span className={`cc-ptag channel-${item.channel}`}>{item.channel}</span>
                                         </div>
                                     </div>
-                                    <button className="plan-go">Go</button>
+                                    <button className="cc-plan-go">Go</button>
                                 </div>
                             ))}
                         </div>
                     </div>
 
-                    {/* Right: Quick actions */}
-                    <div className="ov-quick anim-item" style={{ '--i': 3 }}>
+                    {/* ── Quick Actions ── */}
+                    <div className="cc-card cc-quick cc-anim" style={{ '--i': 6 }}>
                         <h2>Quick Actions</h2>
-                        <div className="qa-grid">
-                            <button className="qa-btn primary">
-                                {Ic.plus}<span>Create Post</span>
-                            </button>
-                            <button className="qa-btn">
-                                {Ic.msg}<span>New Thread</span>
-                            </button>
-                            <button className="qa-btn">
-                                {Ic.msg}<span>Broadcast</span>
-                            </button>
-                            <button className="qa-btn">
-                                {Ic.zap}<span>Automation</span>
-                            </button>
+                        <div className="cc-qa-grid">
+                            <Link to="/composer" className="cc-qa primary" style={{ '--qa': '#00c93a' }}>
+                                <div className="cc-qa-orb">{Ic.plus}</div>
+                                <span>Create Post</span>
+                            </Link>
+                            <Link to="/composer" className="cc-qa" style={{ '--qa': '#818cf8' }}>
+                                <div className="cc-qa-orb">{Ic.msg}</div>
+                                <span>New Thread</span>
+                            </Link>
+                            <Link to="/inbox" className="cc-qa" style={{ '--qa': '#f59e0b' }}>
+                                <div className="cc-qa-orb">{Ic.broadcast}</div>
+                                <span>Broadcast</span>
+                            </Link>
+                            <Link to="/automation" className="cc-qa" style={{ '--qa': '#a855f7' }}>
+                                <div className="cc-qa-orb">{Ic.zap}</div>
+                                <span>Automation</span>
+                            </Link>
                         </div>
                     </div>
                 </div>
 
-                {/* ── Signals ── */}
-                <div className="ov-signals-section anim-item" style={{ '--i': 4 }}>
-                    <div className="signals-head">
+                {/* ── Hot Signals ── */}
+                <div className="cc-signals-wrap cc-anim" style={{ '--i': 7 }}>
+                    <div className="cc-signals-head">
                         <h2>Hot Signals</h2>
-                        <span className="signals-badge">{signals.length} requiring attention</span>
+                        <span className="cc-signals-count">
+                            <span className="cc-count-dot" />
+                            {signals.length} requiring attention
+                        </span>
                     </div>
-                    <div className="ov-signals">
+                    <div className="cc-signals">
                         {signals.map((s, idx) => (
-                            <div key={idx} className={`sig ${s.type} `} style={{ '--j': idx }}>
-                                <div className="sig-top">
-                                    <div className="sig-label">
-                                        <span className="sig-icon">{s.icon}</span>
+                            <div key={idx} className={`cc-sig cc-sig-${s.type}`}>
+                                <div className="cc-sig-top">
+                                    <div className="cc-sig-label">
+                                        <span className="cc-sig-icon">{s.icon}</span>
                                         <span>{s.label}</span>
                                     </div>
-                                    <span className={`sig - badge ${s.badgeClass} `}>{s.badge}</span>
+                                    <span className={`cc-sig-badge ${s.badgeClass}`}>{s.badge}</span>
                                 </div>
 
                                 {s.name && (
-                                    <div className="sig-from">
-                                        <div className={`sig - avatar ${s.vip ? 'vip' : ''} `}>{s.initials}</div>
+                                    <div className="cc-sig-from">
+                                        <div className={`cc-sig-avatar ${s.vip ? 'vip' : ''}`}>{s.initials}</div>
                                         <div>
-                                            <span className="sig-name">{s.name}{s.vip && <span className="sig-verified">✓</span>}</span>
-                                            <span className="sig-handle">{s.handle}</span>
+                                            <span className="cc-sig-name">
+                                                {s.name}
+                                                {s.vip && <span className="cc-sig-verified">✓</span>}
+                                            </span>
+                                            <span className="cc-sig-handle">{s.handle}</span>
                                         </div>
                                     </div>
                                 )}
 
-                                <p className="sig-msg">{s.msg}</p>
+                                <p className="cc-sig-msg">{s.msg}</p>
 
                                 {s.stats && (
-                                    <div className="sig-stats">
+                                    <div className="cc-sig-stats">
                                         {s.stats.map((st, i) => (
-                                            <div key={i} className="sig-stat">
-                                                <span className="sig-stat-v">{st.v}</span>
-                                                <span className="sig-stat-l">{st.l}</span>
+                                            <div key={i} className="cc-sig-stat">
+                                                <span className="cc-sig-stat-v">{st.v}</span>
+                                                <span className="cc-sig-stat-l">{st.l}</span>
                                             </div>
                                         ))}
                                     </div>
                                 )}
 
-                                <div className="sig-foot">
-                                    <div className="sig-meta">
-                                        <span className="sig-time">{s.time}</span>
-                                        <span className={`sig - tag ${s.tagClass} `}>{s.tag}</span>
+                                <div className="cc-sig-foot">
+                                    <div className="cc-sig-meta">
+                                        <span className="cc-sig-time">{s.time}</span>
+                                        <span className={`cc-sig-tag ${s.tagClass}`}>{s.tag}</span>
                                     </div>
-                                    <div className="sig-actions">
+                                    <div className="cc-sig-actions">
                                         {s.actions.map((a, i) => (
-                                            <button key={i} className={`sig - btn ${i === 0 ? 'primary' : ''} `}>{a}</button>
+                                            <button key={i} className={`cc-sig-btn ${i === 0 ? 'primary' : ''}`}>{a}</button>
                                         ))}
                                     </div>
                                 </div>

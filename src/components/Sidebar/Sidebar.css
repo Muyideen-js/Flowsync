@@ -253,6 +253,45 @@
     }
 }
 
+/* ── Sign out button ──────────────────────── */
+
+.sidebar-signout {
+    padding: 8px 10px 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.signout-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    letter-spacing: -0.01em;
+}
+
+.signout-btn:hover {
+    color: #ff6b6b;
+    background: rgba(255, 107, 107, 0.08);
+}
+
+.signout-btn:hover .nav-row-icon {
+    color: #ff6b6b;
+}
+
+.signout-btn .nav-row-icon {
+    color: rgba(255, 255, 255, 0.35);
+    transition: color 0.15s ease;
+}
+
 /* ── Scrollbar ────────────────────────────── */
 
 .sidebar-scroll::-webkit-scrollbar {
@@ -283,7 +322,8 @@
     .nav-row-text,
     .nav-section-label,
     .channels-label,
-    .ch-letter {
+    .ch-letter,
+    .signout-text {
         display: none;
     }
 

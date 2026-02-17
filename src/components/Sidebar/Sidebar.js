@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import './Sidebar.css';
 
 /* ─── Inline SVG Icons (1.5px stroke, 20×20) ─── */
 
 const icons = {
-    /* Overview — 4-square grid */
     grid: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="2.5" y="2.5" width="6" height="6" rx="1.5" />
@@ -14,7 +14,6 @@ const icons = {
             <rect x="11.5" y="11.5" width="6" height="6" rx="1.5" />
         </svg>
     ),
-    /* Accounts — power plug */
     plug: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M6.5 3v3.5" />
@@ -23,14 +22,12 @@ const icons = {
             <path d="M10 15.5V17" />
         </svg>
     ),
-    /* Composer — pen nib */
     quill: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M14.5 2.5a2 2 0 012.83 2.83L7.17 15.5 2.5 17l1.5-4.67L14.5 2.5z" />
             <path d="M12.5 4.5l3 3" />
         </svg>
     ),
-    /* Schedule — calendar */
     calendar: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="2.5" y="3.5" width="15" height="14" rx="2" />
@@ -42,14 +39,12 @@ const icons = {
             <circle cx="13" cy="12" r="0.75" fill="currentColor" stroke="none" />
         </svg>
     ),
-    /* Inbox — open envelope with arrow */
     inbox: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M2.5 10h4l1.5 2.5h4L13.5 10h4" />
             <path d="M4.3 5.3L2.5 10v5a1.5 1.5 0 001.5 1.5h12a1.5 1.5 0 001.5-1.5v-5l-1.8-4.7a1.5 1.5 0 00-1.4-1h-8.6a1.5 1.5 0 00-1.4 1z" />
         </svg>
     ),
-    /* Mentions — speech bubble with @ */
     mention: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M16 12.5a1.5 1.5 0 01-1.5 1.5h-8L3 17.5V5a1.5 1.5 0 011.5-1.5h10A1.5 1.5 0 0116 5v7.5z" />
@@ -57,7 +52,6 @@ const icons = {
             <path d="M12 7v3.2a.8.8 0 001.6 0V9" />
         </svg>
     ),
-    /* Automation — workflow / nodes */
     workflow: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="4.5" cy="5" r="2" />
@@ -67,14 +61,12 @@ const icons = {
             <path d="M13.8 6.2l-2.3 6.8" />
         </svg>
     ),
-    /* Analytics — trend line with dot */
     trend: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 17l4-5.5 3.5 3L17 5" />
             <path d="M14 5h3v3" />
         </svg>
     ),
-    /* Settings — sliders */
     sliders: (
         <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M3 5h3m4 0h7" />
@@ -85,10 +77,19 @@ const icons = {
             <circle cx="6.5" cy="15" r="1.5" />
         </svg>
     ),
+    logout: (
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M7.5 17.5H4.17a1.67 1.67 0 01-1.67-1.67V4.17A1.67 1.67 0 014.17 2.5H7.5" />
+            <path d="M13.33 14.17L17.5 10l-4.17-4.17" />
+            <path d="M17.5 10H7.5" />
+        </svg>
+    ),
 };
 
 const Sidebar = () => {
     const location = useLocation();
+    const navigate = useNavigate();
+    const { logout } = useAuth();
     const [hoveredItem, setHoveredItem] = useState(null);
 
     const mainNav = [
@@ -109,12 +110,10 @@ const Sidebar = () => {
         { id: 'settings', label: 'Settings', icon: 'sliders', path: '/settings' },
     ];
 
-    const channels = [
-        { id: 'instagram', name: 'IG', color: '#E4405F', connected: true },
-        { id: 'twitter', name: 'X', color: '#1DA1F2', connected: true },
-        { id: 'whatsapp', name: 'WA', color: '#25D366', connected: false },
-        { id: 'telegram', name: 'TG', color: '#0088cc', connected: true },
-    ];
+    const handleLogout = async () => {
+        await logout();
+        navigate('/login');
+    };
 
     const renderSection = (title, items) => (
         <div className="nav-section">
@@ -159,22 +158,12 @@ const Sidebar = () => {
                 {renderSection('Insights', insightsNav)}
             </nav>
 
-            {/* ── Channels strip ── */}
-            <div className="sidebar-channels">
-                <span className="channels-label">Channels</span>
-                <div className="channels-row">
-                    {channels.map(ch => (
-                        <div
-                            key={ch.id}
-                            className={`ch-pill ${ch.connected ? 'on' : 'off'}`}
-                            style={{ '--ch': ch.color }}
-                            title={ch.name}
-                        >
-                            <span className="ch-letter">{ch.name}</span>
-                            <span className="ch-dot" />
-                        </div>
-                    ))}
-                </div>
+            {/* ── Sign out ── */}
+            <div className="sidebar-signout">
+                <button className="signout-btn" onClick={handleLogout}>
+                    <span className="nav-row-icon">{icons.logout}</span>
+                    <span className="signout-text">Sign out</span>
+                </button>
             </div>
         </aside>
     );

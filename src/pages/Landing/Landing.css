@@ -839,7 +839,7 @@
 }
 
 /* ========================================
-   HOW IT WORKS — TIMELINE
+   HOW IT WORKS — CARD GRID
    ======================================== */
 
 .how-it-works {
@@ -849,88 +849,92 @@
     overflow: hidden;
 }
 
-.hiw-timeline {
+/* Grid layout */
+.hiw-grid {
     display: flex;
-    flex-direction: column;
+    align-items: stretch;
     gap: 0;
-    max-width: 600px;
+    max-width: 1100px;
     margin: 0 auto;
-    position: relative;
-}
-
-/* Step container */
-.hiw-step {
-    display: grid;
-    grid-template-columns: 48px 1fr;
-    gap: 24px;
-    position: relative;
-    padding-bottom: 40px;
-}
-
-.hiw-step:last-child {
-    padding-bottom: 0;
-}
-
-/* Vertical connector line */
-.hiw-connector {
-    position: absolute;
-    left: 23px;
-    top: 48px;
-    bottom: 0;
-    width: 2px;
-    background: linear-gradient(180deg, rgba(0, 150, 45, 0.4), rgba(0, 150, 45, 0.05));
-}
-
-/* Step number badge */
-.hiw-num {
-    width: 48px;
-    height: 48px;
-    background: linear-gradient(135deg, #00962d 0%, #00c93a 100%);
-    border-radius: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.125rem;
-    font-weight: 800;
-    color: #fff;
-    position: relative;
-    z-index: 2;
-    box-shadow:
-        0 4px 16px rgba(0, 150, 45, 0.3),
-        0 0 40px rgba(0, 201, 58, 0.08);
-    flex-shrink: 0;
 }
 
 /* Card */
 .hiw-card {
-    padding: 24px;
+    flex: 1;
+    padding: 28px 24px 24px;
     background: rgba(255, 255, 255, 0.025);
     border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 14px;
-    transition: border-color 0.25s ease, background 0.25s ease;
+    border-radius: 16px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.3s ease, transform 0.3s ease, background 0.3s ease;
 }
 
 .hiw-card:hover {
-    border-color: rgba(0, 201, 58, 0.15);
+    border-color: rgba(0, 201, 58, 0.2);
     background: rgba(255, 255, 255, 0.04);
+    transform: translateY(-4px);
 }
 
-/* Icon inside card */
+/* Top glow accent */
+.hiw-card-glow {
+    position: absolute;
+    top: 0;
+    left: 20%;
+    right: 20%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0, 201, 58, 0.5), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.hiw-card:hover .hiw-card-glow {
+    opacity: 1;
+}
+
+/* Card header (number + icon) */
+.hiw-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+/* Step number */
+.hiw-num {
+    width: 36px;
+    height: 36px;
+    background: rgba(0, 150, 45, 0.12);
+    border: 1px solid rgba(0, 150, 45, 0.2);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.hiw-num span {
+    font-size: 13px;
+    font-weight: 800;
+    color: #00c93a;
+    letter-spacing: 0.02em;
+}
+
+/* Icon */
 .hiw-icon {
-    width: 44px;
-    height: 44px;
-    background: rgba(0, 150, 45, 0.1);
-    border: 1px solid rgba(0, 150, 45, 0.15);
+    width: 38px;
+    height: 38px;
+    background: rgba(0, 150, 45, 0.08);
+    border: 1px solid rgba(0, 150, 45, 0.12);
     border-radius: 10px;
     display: flex;
     align-items: center;
     justify-content: center;
     color: #00c93a;
-    margin-bottom: 14px;
 }
 
 .hiw-card h3 {
-    font-size: 1.063rem;
+    font-size: 1rem;
     font-weight: 700;
     color: #fff;
     margin: 0 0 8px;
@@ -938,51 +942,81 @@
 }
 
 .hiw-card p {
-    font-size: 0.875rem;
+    font-size: 0.813rem;
     line-height: 1.6;
-    color: rgba(255, 255, 255, 0.55);
-    margin: 0 0 14px;
+    color: rgba(255, 255, 255, 0.5);
+    margin: 0 0 16px;
+}
+
+/* Horizontal connector between cards */
+.hiw-connector-h {
+    width: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.hiw-connector-h::before {
+    content: '';
+    width: 100%;
+    height: 2px;
+    background: linear-gradient(90deg, rgba(0, 150, 45, 0.3), rgba(0, 150, 45, 0.1));
+    border-radius: 1px;
+}
+
+.hiw-connector-h::after {
+    content: '';
+    position: absolute;
+    right: -2px;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: rgba(0, 150, 45, 0.3);
 }
 
 /* Tags */
 .hiw-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 5px;
 }
 
 .hiw-tags span {
-    padding: 3px 10px;
-    background: rgba(0, 150, 45, 0.08);
-    border: 1px solid rgba(0, 150, 45, 0.12);
+    padding: 3px 9px;
+    background: rgba(0, 150, 45, 0.06);
+    border: 1px solid rgba(0, 150, 45, 0.1);
     border-radius: 100px;
-    font-size: 0.688rem;
+    font-size: 0.625rem;
     font-weight: 600;
-    color: rgba(0, 201, 58, 0.8);
-    letter-spacing: 0.01em;
+    color: rgba(0, 201, 58, 0.7);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
 }
 
 /* Responsive */
-@media (max-width: 600px) {
-    .hiw-step {
-        grid-template-columns: 40px 1fr;
+@media (max-width: 900px) {
+    .hiw-grid {
+        flex-direction: column;
         gap: 16px;
     }
 
-    .hiw-num {
-        width: 40px;
-        height: 40px;
-        font-size: 1rem;
-        border-radius: 12px;
+    .hiw-connector-h {
+        width: auto;
+        height: 24px;
+        justify-content: center;
     }
 
-    .hiw-connector {
-        left: 19px;
-        top: 40px;
+    .hiw-connector-h::before {
+        width: 2px;
+        height: 100%;
     }
 
-    .hiw-card {
-        padding: 18px;
+    .hiw-connector-h::after {
+        right: auto;
+        bottom: -2px;
+        top: auto;
     }
 }
 

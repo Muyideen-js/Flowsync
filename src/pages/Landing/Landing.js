@@ -78,7 +78,7 @@ const Landing = () => {
                     </p>
 
                     <div className="hero-btns hero-fade-in">
-                        <Link to="/signup">
+                        <Link to="/dashboard">
                             <Button size="medium" className="cursor-target btn-pulse">
                                 Get Started Free
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -345,93 +345,84 @@ const Landing = () => {
                         <p className="section-desc">Get up and running in minutes, not days</p>
                     </div>
 
-                    <div className="hiw-timeline">
-                        {/* Step 1 */}
-                        <div className="hiw-step cursor-target">
-                            <div className="hiw-connector" />
-                            <div className="hiw-num">
-                                <span>1</span>
-                            </div>
-                            <div className="hiw-card">
+                    <div className="hiw-grid">
+                        <div className="hiw-card cursor-target">
+                            <div className="hiw-card-glow" />
+                            <div className="hiw-card-header">
+                                <div className="hiw-num"><span>01</span></div>
                                 <div className="hiw-icon">
-                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                                         <path d="M15 7h3a5 5 0 0 1 0 10h-3m-6 0H6a5 5 0 0 1 0-10h3" />
                                         <line x1="8" y1="12" x2="16" y2="12" />
                                     </svg>
                                 </div>
-                                <h3>Connect Your Platforms</h3>
-                                <p>Link your X, Telegram, Instagram & WhatsApp accounts with one-click OAuth. Secure, encrypted, and using official APIs only.</p>
-                                <div className="hiw-tags">
-                                    <span>OAuth 2.0</span>
-                                    <span>Encrypted</span>
-                                    <span>30 seconds</span>
-                                </div>
+                            </div>
+                            <h3>Connect Platforms</h3>
+                            <p>Link X, Telegram, Instagram & WhatsApp with one-click OAuth. Secure and encrypted.</p>
+                            <div className="hiw-tags">
+                                <span>OAuth 2.0</span>
+                                <span>30 seconds</span>
                             </div>
                         </div>
 
-                        {/* Step 2 */}
-                        <div className="hiw-step cursor-target">
-                            <div className="hiw-connector" />
-                            <div className="hiw-num">
-                                <span>2</span>
-                            </div>
-                            <div className="hiw-card">
+                        <div className="hiw-connector-h" />
+
+                        <div className="hiw-card cursor-target">
+                            <div className="hiw-card-glow" />
+                            <div className="hiw-card-header">
+                                <div className="hiw-num"><span>02</span></div>
                                 <div className="hiw-icon">
-                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                                         <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" />
                                     </svg>
                                 </div>
-                                <h3>Build Smart Workflows</h3>
-                                <p>Create IF-AI-ACTION automations with our visual builder. Set triggers, let AI process, and define actions across all your channels.</p>
-                                <div className="hiw-tags">
-                                    <span>Visual builder</span>
-                                    <span>AI logic</span>
-                                    <span>Cross-platform</span>
-                                </div>
+                            </div>
+                            <h3>Build Workflows</h3>
+                            <p>Create IF-AI-ACTION automations with our visual builder. Cross-platform triggers and actions.</p>
+                            <div className="hiw-tags">
+                                <span>Visual builder</span>
+                                <span>AI logic</span>
                             </div>
                         </div>
 
-                        {/* Step 3 */}
-                        <div className="hiw-step cursor-target">
-                            <div className="hiw-connector" />
-                            <div className="hiw-num">
-                                <span>3</span>
-                            </div>
-                            <div className="hiw-card">
+                        <div className="hiw-connector-h" />
+
+                        <div className="hiw-card cursor-target">
+                            <div className="hiw-card-glow" />
+                            <div className="hiw-card-header">
+                                <div className="hiw-num"><span>03</span></div>
                                 <div className="hiw-icon">
-                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                                         <path d="M9 11l3 3L22 4" />
                                         <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
                                     </svg>
                                 </div>
-                                <h3>Review &amp; Approve</h3>
-                                <p>AI drafts replies and content for you. Review suggestions, edit if needed, and approve with one click. You stay in full control.</p>
-                                <div className="hiw-tags">
-                                    <span>AI drafts</span>
-                                    <span>Human review</span>
-                                    <span>One-click</span>
-                                </div>
+                            </div>
+                            <h3>Review & Approve</h3>
+                            <p>AI drafts replies and content. Review, edit if needed, and approve with one click.</p>
+                            <div className="hiw-tags">
+                                <span>Human review</span>
+                                <span>One-click</span>
                             </div>
                         </div>
 
-                        {/* Step 4 */}
-                        <div className="hiw-step cursor-target">
-                            <div className="hiw-num">
-                                <span>4</span>
-                            </div>
-                            <div className="hiw-card">
+                        <div className="hiw-connector-h" />
+
+                        <div className="hiw-card cursor-target">
+                            <div className="hiw-card-glow" />
+                            <div className="hiw-card-header">
+                                <div className="hiw-num"><span>04</span></div>
                                 <div className="hiw-icon">
-                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                                         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
                                     </svg>
                                 </div>
-                                <h3>Scale &amp; Grow</h3>
-                                <p>Watch engagement soar while saving 20+ hours per week. Real-time analytics show exactly how your automation is performing.</p>
-                                <div className="hiw-tags">
-                                    <span>20h+ saved</span>
-                                    <span>Analytics</span>
-                                    <span>Growth</span>
-                                </div>
+                            </div>
+                            <h3>Scale & Grow</h3>
+                            <p>Save 20+ hours per week. Real-time analytics show exactly how automation is performing.</p>
+                            <div className="hiw-tags">
+                                <span>20h+ saved</span>
+                                <span>Analytics</span>
                             </div>
                         </div>
                     </div>
