@@ -24,6 +24,7 @@ const platforms = [
     },
     {
         id: 'whatsapp', name: 'WhatsApp', color: '#25D366', abbr: 'WA',
+        connectType: 'qr',
         icon: (
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 21l1.5-5.5A9 9 0 1116.5 19L3 21z" />
@@ -42,16 +43,18 @@ const platforms = [
     },
 ];
 
+/* All platforms start as NOT connected */
 const connectionData = {
     instagram: { connected: false, handle: null, lastSync: null, stats: {} },
     twitter: { connected: false, handle: null, lastSync: null, stats: {} },
-    whatsapp: { connected: true, handle: '+1 (555) 123-4567', lastSync: '2 min ago', stats: { conversations: 45, unread: 3 } },
+    whatsapp: { connected: false, handle: null, lastSync: null, stats: {} },
     telegram: { connected: false, handle: null, lastSync: null, stats: {} },
 };
 
 const Accounts = () => {
     const [loaded, setLoaded] = useState(false);
     const [connections, setConnections] = useState(connectionData);
+    const [qrModal, setQrModal] = useState(null); // null or platform id
 
     useEffect(() => {
         requestAnimationFrame(() => setLoaded(true));
@@ -60,7 +63,27 @@ const Accounts = () => {
     const connectedCount = Object.values(connections).filter(c => c.connected).length;
 
     const handleConnect = (id) => {
-        alert(`Opening connection flow for ${id}…`);
+        const platform = platforms.find(p => p.id === id);
+        // WhatsApp uses QR code flow
+        if (platform?.connectType === 'qr') {
+            setQrModal(id);
+            return;
+        }
+        // Other platforms use OAuth (placeholder)
+        alert(`Opening OAuth flow for ${platform?.name}…`);
+    };
+
+    const handleQrSuccess = () => {
+        setConnections(prev => ({
+            ...prev,
+            [qrModal]: {
+                connected: true,
+                handle: 'Connected via QR',
+                lastSync: 'Just now',
+                stats: { conversations: 0, unread: 0 }
+            }
+        }));
+        setQrModal(null);
     };
 
     const handleDisconnect = (id) => {
@@ -119,7 +142,6 @@ const Accounts = () => {
                                 {/* Connected state */}
                                 {conn.connected ? (
                                     <>
-                                        {/* Stats row */}
                                         <div className="ac-stats">
                                             {Object.entries(conn.stats).map(([key, val]) => (
                                                 <div key={key} className="ac-stat">
@@ -132,8 +154,6 @@ const Accounts = () => {
                                                 <span className="ac-stat-key">last sync</span>
                                             </div>
                                         </div>
-
-                                        {/* Actions */}
                                         <div className="ac-actions">
                                             <button className="ac-btn" onClick={() => handleConnect(p.id)}>Reconnect</button>
                                             <button className="ac-btn danger" onClick={() => handleDisconnect(p.id)}>Disconnect</button>
@@ -141,20 +161,18 @@ const Accounts = () => {
                                     </>
                                 ) : (
                                     <>
-                                        {/* Unconnected benefits */}
                                         <ul className="ac-benefits">
                                             <li>Automated posting & scheduling</li>
                                             <li>AI-powered responses</li>
                                             <li>Unified inbox</li>
                                             <li>Analytics & insights</li>
                                         </ul>
-
                                         <button
                                             className="ac-connect"
                                             style={{ '--brand': p.color }}
                                             onClick={() => handleConnect(p.id)}
                                         >
-                                            Connect {p.name}
+                                            {p.connectType === 'qr' ? `Scan QR to connect ${p.name}` : `Connect ${p.name}`}
                                         </button>
                                     </>
                                 )}
@@ -175,6 +193,107 @@ const Accounts = () => {
                         </div>
                         <div className="ab-text">
                             <strong>{platforms.length - connectedCount} platform{platforms.length - connectedCount > 1 ? 's' : ''}</strong> not yet connected. Link them to manage all your social media from one place.
+                        </div>
+                    </div>
+                )}
+
+                {/* ═══ QR Code Modal ═══ */}
+                {qrModal && (
+                    <div className="qr-overlay" onClick={() => setQrModal(null)}>
+                        <div className="qr-modal" onClick={(e) => e.stopPropagation()}>
+                            <button className="qr-close" onClick={() => setQrModal(null)}>
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                                    <path d="M18 6L6 18M6 6l12 12" />
+                                </svg>
+                            </button>
+
+                            <div className="qr-header">
+                                <div className="qr-icon-wrap" style={{ '--brand': '#25D366' }}>
+                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M3 21l1.5-5.5A9 9 0 1116.5 19L3 21z" />
+                                        <path d="M9 10a1.5 1.5 0 011.5 1.5A3 3 0 0013.5 14h1A1.5 1.5 0 0116 12.5" />
+                                    </svg>
+                                </div>
+                                <h2>Connect WhatsApp</h2>
+                                <p>Scan this QR code with your WhatsApp mobile app to link your account.</p>
+                            </div>
+
+                            <div className="qr-code-area">
+                                {/* Simulated QR code pattern */}
+                                <div className="qr-code">
+                                    <svg viewBox="0 0 200 200" width="200" height="200">
+                                        {/* Corner squares */}
+                                        <rect x="10" y="10" width="50" height="50" rx="4" fill="#fff" />
+                                        <rect x="15" y="15" width="40" height="40" rx="2" fill="#0a0a0a" />
+                                        <rect x="22" y="22" width="26" height="26" rx="1" fill="#fff" />
+
+                                        <rect x="140" y="10" width="50" height="50" rx="4" fill="#fff" />
+                                        <rect x="145" y="15" width="40" height="40" rx="2" fill="#0a0a0a" />
+                                        <rect x="152" y="22" width="26" height="26" rx="1" fill="#fff" />
+
+                                        <rect x="10" y="140" width="50" height="50" rx="4" fill="#fff" />
+                                        <rect x="15" y="145" width="40" height="40" rx="2" fill="#0a0a0a" />
+                                        <rect x="22" y="152" width="26" height="26" rx="1" fill="#fff" />
+
+                                        {/* Random data pattern */}
+                                        {Array.from({ length: 40 }, (_, i) => {
+                                            const x = 70 + (i % 8) * 9;
+                                            const y = 70 + Math.floor(i / 8) * 9;
+                                            return (i * 7 + 3) % 3 !== 0 ? (
+                                                <rect key={`d${i}`} x={x} y={y} width="7" height="7" rx="1" fill="#fff" opacity="0.9" />
+                                            ) : null;
+                                        })}
+                                        {Array.from({ length: 12 }, (_, i) => {
+                                            const x = 70 + (i % 6) * 10;
+                                            const y = 10 + Math.floor(i / 6) * 12;
+                                            return (
+                                                <rect key={`t${i}`} x={x} y={y} width="7" height="7" rx="1" fill="#fff" opacity="0.8" />
+                                            );
+                                        })}
+                                        {Array.from({ length: 12 }, (_, i) => {
+                                            const x = 10 + (i % 6) * 10;
+                                            const y = 70 + Math.floor(i / 6) * 10;
+                                            return (i * 5 + 2) % 3 !== 0 ? (
+                                                <rect key={`l${i}`} x={x} y={y} width="7" height="7" rx="1" fill="#fff" opacity="0.85" />
+                                            ) : null;
+                                        })}
+                                        {Array.from({ length: 10 }, (_, i) => {
+                                            const x = 140 + (i % 5) * 10;
+                                            const y = 70 + Math.floor(i / 5) * 12;
+                                            return (i * 3 + 1) % 2 !== 0 ? (
+                                                <rect key={`r${i}`} x={x} y={y} width="7" height="7" rx="1" fill="#fff" opacity="0.75" />
+                                            ) : null;
+                                        })}
+
+                                        {/* WhatsApp logo in center */}
+                                        <rect x="82" y="82" width="36" height="36" rx="8" fill="#25D366" />
+                                        <g transform="translate(88,88) scale(0.9)">
+                                            <path d="M2 22l1.2-4.4A7.2 7.2 0 1113.2 15.2L2 22z" fill="none" stroke="#fff" strokeWidth="1.5" />
+                                        </g>
+                                    </svg>
+                                    <div className="qr-scan-line" />
+                                </div>
+                            </div>
+
+                            <div className="qr-steps">
+                                <div className="qr-step">
+                                    <span className="qr-step-num">1</span>
+                                    <span>Open WhatsApp on your phone</span>
+                                </div>
+                                <div className="qr-step">
+                                    <span className="qr-step-num">2</span>
+                                    <span>Go to <strong>Settings → Linked Devices</strong></span>
+                                </div>
+                                <div className="qr-step">
+                                    <span className="qr-step-num">3</span>
+                                    <span>Tap <strong>Link a Device</strong> and scan this code</span>
+                                </div>
+                            </div>
+
+                            {/* Demo: simulate successful scan */}
+                            <button className="qr-sim-btn" onClick={handleQrSuccess}>
+                                Simulate Successful Scan
+                            </button>
                         </div>
                     </div>
                 )}
