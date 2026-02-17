@@ -10,7 +10,8 @@
 /backend/node_modules
 /.pnp
 .pnp.js
-
+backend/.wwebjs_auth/
+backend/.wwebjs_cache/
 # testing
 /coverage
 

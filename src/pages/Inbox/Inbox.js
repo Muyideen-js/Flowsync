@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import MainLayout from '../../components/Layout/MainLayout';
 import './Inbox.css';
+import { io } from 'socket.io-client';
 
 const platformMeta = {
     instagram: { abbr: 'IG', color: '#E4405F', name: 'Instagram' },
@@ -40,19 +41,9 @@ const Inbox = () => {
     const [aiIntent, setAiIntent] = useState('');
     const [autoReply, setAutoReply] = useState({ instagram: false, twitter: false, whatsapp: true, telegram: false });
 
-    useEffect(() => {
-        requestAnimationFrame(() => setLoaded(true));
-    }, []);
-
     const [threads, setThreads] = useState([
-        {
-            id: 1, platform: 'whatsapp', from: '+234 801 234 5678', name: 'John Doe', avatar: 'JD',
-            intent: 'sales', vip: true, tags: ['sales-lead'],
-            messages: [
-                { text: 'Hi! I saw your product online. How much does the Premium plan cost?', time: '5m ago', incoming: true },
-                { text: 'Also, do you offer any discounts for annual subscriptions?', time: '4m ago', incoming: true },
-            ], unread: true, flagged: true
-        },
+        // Mock data for other platforms will form the initial state
+        // We will filter out 'whatsapp' mock data once real data arrives
         {
             id: 2, platform: 'twitter', from: '@tech_sarah', name: 'Tech Sarah', avatar: 'TS',
             intent: 'general', vip: false, tags: [],
@@ -92,15 +83,73 @@ const Inbox = () => {
                 { text: 'Your auto-reply feature sent the wrong response to one of our customers 😬', time: '4h ago', incoming: true },
             ], unread: false, flagged: true
         },
-        {
-            id: 7, platform: 'whatsapp', from: '+1 555 123 4567', name: 'Michael B', avatar: 'MB',
-            intent: 'general', vip: false, tags: [],
-            messages: [
-                { text: 'Love the product! When are you launching the mobile app?', time: '5h ago', incoming: true },
-                { text: 'Thanks Michael! We\'re targeting Q2 2026 for the mobile app launch. Stay tuned!', time: '4h ago', incoming: false },
-            ], unread: false, flagged: false
-        },
     ]);
+
+    useEffect(() => {
+        requestAnimationFrame(() => setLoaded(true));
+
+        // Connect to socket
+        const socket = io('http://localhost:5000');
+
+        socket.on('connect', () => {
+            console.log('Inbox connected to socket');
+            socket.emit('start_whatsapp'); // Ensure client is active
+            socket.emit('get_whatsapp_chats'); // Fetch chats
+        });
+
+        socket.on('whatsapp_chats', (chats) => {
+            console.log('Received WhatsApp chats:', chats);
+            setThreads(prev => {
+                // Keep non-whatsapp threads, replace/append real whatsapp ones
+                const others = prev.filter(t => t.platform !== 'whatsapp');
+                return [...chats, ...others].sort((a, b) => {
+                    // Simple sort by unread or ID for now (real app needs timestamp parsing)
+                    return (b.unread ? 1 : 0) - (a.unread ? 1 : 0);
+                });
+            });
+        });
+
+        socket.on('whatsapp_message', (msg) => {
+            console.log('New WhatsApp message:', msg);
+            setThreads(prev => {
+                const threadIndex = prev.findIndex(t => t.id === msg.chatId);
+                if (threadIndex > -1) {
+                    // Update existing thread
+                    const newThreads = [...prev];
+                    const thread = newThreads[threadIndex];
+                    newThreads[threadIndex] = {
+                        ...thread,
+                        messages: [...thread.messages, {
+                            text: msg.text,
+                            time: msg.time,
+                            incoming: msg.incoming
+                        }],
+                        unread: msg.incoming ? true : thread.unread
+                    };
+                    // Move to top?
+                    return newThreads;
+                } else {
+                    // Create new thread (handled by get_chats usually, but real-time new chat?)
+                    // For now, simpler to just re-fetch or append
+                    return prev;
+                }
+            });
+        });
+
+        socket.on('whatsapp_ready', () => {
+            console.log('WhatsApp Ready - Fetching chats');
+            socket.emit('get_whatsapp_chats');
+        });
+
+        socket.on('whatsapp_authenticated', () => {
+            console.log('WhatsApp Authenticated - Fetching chats');
+            socket.emit('get_whatsapp_chats');
+        });
+
+        return () => socket.disconnect();
+    }, []);
+
+
 
     const filters = [
         { key: 'all', label: 'All' },

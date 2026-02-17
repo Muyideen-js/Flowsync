@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import MainLayout from '../../components/Layout/MainLayout';
+import { io } from 'socket.io-client';
+import { QRCodeSVG } from 'qrcode.react';
 import './Accounts.css';
 
 /* ── Platform brand config ── */
@@ -44,7 +46,7 @@ const platforms = [
 ];
 
 /* All platforms start as NOT connected */
-const connectionData = {
+const initialConnectionData = {
     instagram: { connected: false, handle: null, lastSync: null, stats: {} },
     twitter: { connected: false, handle: null, lastSync: null, stats: {} },
     whatsapp: { connected: false, handle: null, lastSync: null, stats: {} },
@@ -53,37 +55,122 @@ const connectionData = {
 
 const Accounts = () => {
     const [loaded, setLoaded] = useState(false);
-    const [connections, setConnections] = useState(connectionData);
+    const [connections, setConnections] = useState(initialConnectionData);
     const [qrModal, setQrModal] = useState(null); // null or platform id
+    const [qrCode, setQrCode] = useState('');
+    const [qrStatus, setQrStatus] = useState('loading'); // 'loading' | 'scanning' | 'authenticating' | 'error'
+    const socketRef = useRef(null);
 
+    // Connect to backend socket on mount and check WhatsApp status
     useEffect(() => {
         requestAnimationFrame(() => setLoaded(true));
+
+        const socket = io('http://localhost:5000', {
+            reconnectionAttempts: 5,
+            timeout: 10000
+        });
+        socketRef.current = socket;
+
+        socket.on('connect', () => {
+            console.log('Connected to WebSocket');
+            // Check if WhatsApp is already authenticated
+            socket.emit('get_whatsapp_status');
+        });
+
+        socket.on('connect_error', (err) => {
+            console.error('Socket connection error:', err);
+        });
+
+        socket.on('error', (msg) => {
+            console.error('Backend error:', msg);
+        });
+
+        // WhatsApp status events
+        socket.on('whatsapp_status', (status) => {
+            console.log('WhatsApp status:', status);
+            if (status.ready) {
+                markWhatsAppConnected();
+            }
+        });
+
+        socket.on('qr_code', (qr) => {
+            console.log('Received QR Code');
+            setQrCode(qr);
+            setQrStatus('scanning');
+        });
+
+        socket.on('whatsapp_authenticated', () => {
+            console.log('WhatsApp Authenticated');
+            setQrStatus('authenticating');
+            markWhatsAppConnected();
+            // Close QR modal automatically after a brief "success" flash
+            setTimeout(() => {
+                setQrModal(null);
+                setQrCode('');
+            }, 800);
+        });
+
+        socket.on('whatsapp_ready', () => {
+            console.log('WhatsApp Ready');
+            markWhatsAppConnected();
+            setQrModal(null);
+            setQrCode('');
+        });
+
+        socket.on('whatsapp_auth_failure', () => {
+            setQrCode('error');
+            setQrStatus('error');
+        });
+
+        socket.on('whatsapp_disconnected', () => {
+            setConnections(prev => ({
+                ...prev,
+                whatsapp: { connected: false, handle: null, lastSync: null, stats: {} }
+            }));
+        });
+
+        return () => {
+            socket.disconnect();
+            socketRef.current = null;
+        };
     }, []);
+
+    const markWhatsAppConnected = () => {
+        setConnections(prev => ({
+            ...prev,
+            whatsapp: {
+                connected: true,
+                handle: 'WhatsApp Business',
+                lastSync: 'Just now',
+                stats: { conversations: 0, unread: 0 }
+            }
+        }));
+    };
 
     const connectedCount = Object.values(connections).filter(c => c.connected).length;
 
     const handleConnect = (id) => {
         const platform = platforms.find(p => p.id === id);
+
         // WhatsApp uses QR code flow
         if (platform?.connectType === 'qr') {
             setQrModal(id);
+            setQrCode('');
+            setQrStatus('loading');
+
+            // Tell backend to start WhatsApp if not already
+            if (socketRef.current) {
+                socketRef.current.emit('start_whatsapp');
+            }
             return;
         }
         // Other platforms use OAuth (placeholder)
         alert(`Opening OAuth flow for ${platform?.name}…`);
     };
 
-    const handleQrSuccess = () => {
-        setConnections(prev => ({
-            ...prev,
-            [qrModal]: {
-                connected: true,
-                handle: 'Connected via QR',
-                lastSync: 'Just now',
-                stats: { conversations: 0, unread: 0 }
-            }
-        }));
+    const handleCloseQr = () => {
         setQrModal(null);
+        setQrCode('');
     };
 
     const handleDisconnect = (id) => {
@@ -199,9 +286,9 @@ const Accounts = () => {
 
                 {/* ═══ QR Code Modal ═══ */}
                 {qrModal && (
-                    <div className="qr-overlay" onClick={() => setQrModal(null)}>
+                    <div className="qr-overlay" onClick={handleCloseQr}>
                         <div className="qr-modal" onClick={(e) => e.stopPropagation()}>
-                            <button className="qr-close" onClick={() => setQrModal(null)}>
+                            <button className="qr-close" onClick={handleCloseQr}>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                                     <path d="M18 6L6 18M6 6l12 12" />
                                 </svg>
@@ -215,62 +302,40 @@ const Accounts = () => {
                                     </svg>
                                 </div>
                                 <h2>Connect WhatsApp</h2>
-                                <p>Scan this QR code with your WhatsApp mobile app to link your account.</p>
+                                <p>
+                                    {qrStatus === 'authenticating'
+                                        ? '✅ Authenticated! Connecting...'
+                                        : 'Scan this QR code with your WhatsApp mobile app to link your account.'}
+                                </p>
                             </div>
 
                             <div className="qr-code-area">
-                                {/* Simulated QR code pattern */}
-                                <div className="qr-code">
-                                    <svg viewBox="0 0 200 200" width="200" height="200">
-                                        {/* Corner squares */}
-                                        <rect x="10" y="10" width="50" height="50" rx="4" fill="#fff" />
-                                        <rect x="15" y="15" width="40" height="40" rx="2" fill="#0a0a0a" />
-                                        <rect x="22" y="22" width="26" height="26" rx="1" fill="#fff" />
-
-                                        <rect x="140" y="10" width="50" height="50" rx="4" fill="#fff" />
-                                        <rect x="145" y="15" width="40" height="40" rx="2" fill="#0a0a0a" />
-                                        <rect x="152" y="22" width="26" height="26" rx="1" fill="#fff" />
-
-                                        <rect x="10" y="140" width="50" height="50" rx="4" fill="#fff" />
-                                        <rect x="15" y="145" width="40" height="40" rx="2" fill="#0a0a0a" />
-                                        <rect x="22" y="152" width="26" height="26" rx="1" fill="#fff" />
-
-                                        {/* Random data pattern */}
-                                        {Array.from({ length: 40 }, (_, i) => {
-                                            const x = 70 + (i % 8) * 9;
-                                            const y = 70 + Math.floor(i / 8) * 9;
-                                            return (i * 7 + 3) % 3 !== 0 ? (
-                                                <rect key={`d${i}`} x={x} y={y} width="7" height="7" rx="1" fill="#fff" opacity="0.9" />
-                                            ) : null;
-                                        })}
-                                        {Array.from({ length: 12 }, (_, i) => {
-                                            const x = 70 + (i % 6) * 10;
-                                            const y = 10 + Math.floor(i / 6) * 12;
-                                            return (
-                                                <rect key={`t${i}`} x={x} y={y} width="7" height="7" rx="1" fill="#fff" opacity="0.8" />
-                                            );
-                                        })}
-                                        {Array.from({ length: 12 }, (_, i) => {
-                                            const x = 10 + (i % 6) * 10;
-                                            const y = 70 + Math.floor(i / 6) * 10;
-                                            return (i * 5 + 2) % 3 !== 0 ? (
-                                                <rect key={`l${i}`} x={x} y={y} width="7" height="7" rx="1" fill="#fff" opacity="0.85" />
-                                            ) : null;
-                                        })}
-                                        {Array.from({ length: 10 }, (_, i) => {
-                                            const x = 140 + (i % 5) * 10;
-                                            const y = 70 + Math.floor(i / 5) * 12;
-                                            return (i * 3 + 1) % 2 !== 0 ? (
-                                                <rect key={`r${i}`} x={x} y={y} width="7" height="7" rx="1" fill="#fff" opacity="0.75" />
-                                            ) : null;
-                                        })}
-
-                                        {/* WhatsApp logo in center */}
-                                        <rect x="82" y="82" width="36" height="36" rx="8" fill="#25D366" />
-                                        <g transform="translate(88,88) scale(0.9)">
-                                            <path d="M2 22l1.2-4.4A7.2 7.2 0 1113.2 15.2L2 22z" fill="none" stroke="#fff" strokeWidth="1.5" />
-                                        </g>
-                                    </svg>
+                                <div className="qr-code" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
+                                    {qrStatus === 'authenticating' ? (
+                                        <div className="qr-loading" style={{ textAlign: 'center' }}>
+                                            <div style={{ fontSize: '48px', marginBottom: '10px' }}>✅</div>
+                                            <span style={{ color: '#25D366', fontWeight: '600', fontSize: '14px' }}>Connected successfully!</span>
+                                        </div>
+                                    ) : qrCode === 'error' ? (
+                                        <div className="qr-error" style={{ textAlign: 'center', padding: '20px' }}>
+                                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                                <circle cx="12" cy="12" r="10"></circle>
+                                                <line x1="12" y1="8" x2="12" y2="12"></line>
+                                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                            </svg>
+                                            <p style={{ color: '#000', margin: '10px 0 0', fontSize: '13px', fontWeight: '600' }}>Connection Failed</p>
+                                            <p style={{ color: '#666', margin: '4px 0 0', fontSize: '11px' }}>Backend not reachable</p>
+                                        </div>
+                                    ) : qrCode ? (
+                                        <QRCodeSVG value={qrCode} size={180} />
+                                    ) : (
+                                        <div className="qr-loading">
+                                            <div className="spinner"></div>
+                                            <span style={{ color: '#000', marginTop: '10px', fontSize: '12px' }}>
+                                                {qrStatus === 'loading' ? 'Initializing WhatsApp...' : 'Generating QR...'}
+                                            </span>
+                                        </div>
+                                    )}
                                     <div className="qr-scan-line" />
                                 </div>
                             </div>
@@ -289,11 +354,6 @@ const Accounts = () => {
                                     <span>Tap <strong>Link a Device</strong> and scan this code</span>
                                 </div>
                             </div>
-
-                            {/* Demo: simulate successful scan */}
-                            <button className="qr-sim-btn" onClick={handleQrSuccess}>
-                                Simulate Successful Scan
-                            </button>
                         </div>
                     </div>
                 )}

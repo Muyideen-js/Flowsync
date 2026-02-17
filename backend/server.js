@@ -4,12 +4,24 @@ const dotenv = require('dotenv');
 const axios = require('axios');
 const bodyParser = require('body-parser');
 const crypto = require('crypto');
+const http = require('http');
+const { Server } = require('socket.io');
+const { Client, LocalAuth } = require('whatsapp-web.js');
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
+
+// Create HTTP server and Socket.io instance
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: "http://localhost:3000",
+        methods: ["GET", "POST"]
+    }
+});
 
 // Middleware
 app.use(cors());
@@ -27,6 +39,162 @@ const TWITTER_CLIENT_SECRET = process.env.TWITTER_CLIENT_SECRET;
 const CALLBACK_URL = process.env.VERCEL_URL
     ? `https://${process.env.VERCEL_URL}/api/twitter/callback`
     : 'https://ai-automation-app.vercel.app/api/twitter/callback';
+
+// ============ WHATSAPP QAUTH (Real-time QR) ============
+
+let whatsappClient = null;
+let isWhatsAppReady = false;
+
+
+
+const initWhatsApp = async () => {
+    if (whatsappClient) return; // Prevent multiple initializations
+
+    console.log('Initializing WhatsApp Client...');
+    whatsappClient = new Client({
+        authStrategy: new LocalAuth(),
+        puppeteer: {
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        }
+    });
+
+    whatsappClient.on('qr', (qr) => {
+        console.log('QR Code generated');
+        io.emit('qr_code', qr);
+    });
+
+    whatsappClient.on('ready', () => {
+        console.log('WhatsApp Client is ready!');
+        isWhatsAppReady = true;
+        io.emit('whatsapp_ready');
+    });
+
+    whatsappClient.on('authenticated', () => {
+        console.log('WhatsApp Authenticated');
+        io.emit('whatsapp_authenticated');
+    });
+
+    whatsappClient.on('auth_failure', (msg) => {
+        console.error('WhatsApp Auth Failure:', msg);
+        isWhatsAppReady = false;
+        io.emit('whatsapp_auth_failure', msg);
+    });
+
+    whatsappClient.on('disconnected', (reason) => {
+        console.log('WhatsApp Disconnected:', reason);
+        whatsappClient = null;
+        isWhatsAppReady = false;
+        io.emit('whatsapp_disconnected');
+    });
+
+    whatsappClient.on('message_create', async (msg) => {
+        try {
+            const chat = await msg.getChat();
+            const contact = await msg.getContact();
+
+            const messageData = {
+                id: msg.id.id,
+                text: msg.body,
+                from: contact.number,
+                name: contact.name || contact.pushname || contact.number,
+                incoming: !msg.fromMe,
+                time: new Date(msg.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                chatId: chat.id._serialized
+            };
+
+            io.emit('whatsapp_message', messageData);
+        } catch (e) {
+            console.error('Error processing message:', e);
+        }
+    });
+
+    try {
+        await whatsappClient.initialize();
+    } catch (err) {
+        console.error('Failed to initialize WhatsApp client:', err.message);
+        whatsappClient = null; // Reset on failure
+        io.emit('error', 'Failed to initialize WhatsApp. Please restart the backend.');
+    }
+};
+
+/* Handle socket connections */
+io.on('connection', (socket) => {
+    console.log('New client connected:', socket.id);
+
+    // Send current WhatsApp status immediately on connect
+    if (isWhatsAppReady) {
+        socket.emit('whatsapp_ready');
+        socket.emit('whatsapp_authenticated');
+    }
+
+    socket.on('start_whatsapp', () => {
+        if (whatsappClient) {
+            // Already initialized — send current status
+            if (isWhatsAppReady) {
+                socket.emit('whatsapp_ready');
+                socket.emit('whatsapp_authenticated');
+            }
+        } else {
+            initWhatsApp();
+        }
+    });
+
+    socket.on('get_whatsapp_status', () => {
+        socket.emit('whatsapp_status', {
+            initialized: !!whatsappClient,
+            ready: isWhatsAppReady
+        });
+    });
+
+    socket.on('get_whatsapp_chats', async () => {
+        if (!whatsappClient || !isWhatsAppReady) {
+            console.log('WhatsApp not ready yet, skipping chat fetch');
+            return;
+        }
+        try {
+            const chats = await whatsappClient.getChats();
+            const formattedChats = await Promise.all(
+                chats.filter(c => !c.isGroup).slice(0, 15).map(async (chat) => {
+                    const contact = await chat.getContact();
+                    const messages = await chat.fetchMessages({ limit: 5 });
+
+                    return {
+                        id: chat.id._serialized,
+                        platform: 'whatsapp',
+                        from: contact.number,
+                        name: contact.name || contact.pushname || contact.number,
+                        avatar: (contact.name || contact.pushname || contact.number || 'WA').substring(0, 2).toUpperCase(),
+                        intent: 'general',
+                        vip: false,
+                        tags: [],
+                        messages: messages.map(m => ({
+                            text: m.body || '(media)',
+                            time: new Date(m.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            incoming: !m.fromMe
+                        })),
+                        unread: chat.unreadCount > 0,
+                        flagged: false
+                    };
+                })
+            );
+
+            console.log(`Sending ${formattedChats.length} WhatsApp chats to client`);
+            socket.emit('whatsapp_chats', formattedChats);
+        } catch (error) {
+            console.error('Error fetching chats:', error);
+        }
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Client disconnected:', socket.id);
+    });
+});
+
+// Auto-initialize WhatsApp when server starts
+console.log('Auto-initializing WhatsApp...');
+initWhatsApp();
+
 
 // ============ TELEGRAM OAUTH ============
 
@@ -250,8 +418,9 @@ app.get('/health', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`🚀 FlowSync Backend running on http://localhost:${PORT}`);
     console.log(`📡 Health check: http://localhost:${PORT}/health`);
     console.log(`🔐 OAuth endpoints ready`);
+    console.log(`📱 WhatsApp QR ready`);
 });
