@@ -30,6 +30,13 @@
 
 /* ── Greeting ─────────────────────────────── */
 
+.greeting-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
 .ov-greeting h1 {
     font-size: 22px;
     font-weight: 700;
@@ -42,6 +49,29 @@
     font-size: 13.5px;
     color: rgba(255, 255, 255, 0.45);
     margin: 0;
+}
+
+.logout-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.logout-btn:hover {
+    background: rgba(255, 68, 68, 0.08);
+    border-color: rgba(255, 68, 68, 0.2);
+    color: #ff6b6b;
 }
 
 /* ── KPI strip ────────────────────────────── */

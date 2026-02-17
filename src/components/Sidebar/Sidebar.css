@@ -41,7 +41,7 @@
     width: 28px;
     height: 28px;
     border-radius: 8px;
-    background: linear-gradient(135deg, var(--accent) 0%, #00e04a 100%);
+    background: #00c93a;
     display: flex;
     align-items: center;
     justify-content: center;

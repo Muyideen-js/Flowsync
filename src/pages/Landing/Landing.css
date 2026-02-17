@@ -838,56 +838,152 @@
     border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
-.process-steps {
+/* ========================================
+   HOW IT WORKS — TIMELINE
+   ======================================== */
+
+.how-it-works {
+    padding: 100px 20px;
+    background: #000;
+    position: relative;
+    overflow: hidden;
+}
+
+.hiw-timeline {
     display: flex;
-    align-items: center;
-    justify-content: center;
+    flex-direction: column;
+    gap: 0;
+    max-width: 600px;
+    margin: 0 auto;
+    position: relative;
+}
+
+/* Step container */
+.hiw-step {
+    display: grid;
+    grid-template-columns: 48px 1fr;
     gap: 24px;
-    flex-wrap: wrap;
-    margin-top: 40px;
+    position: relative;
+    padding-bottom: 40px;
 }
 
-.p-step {
-    flex: 1;
-    min-width: 140px;
-    max-width: 180px;
-    text-align: center;
+.hiw-step:last-child {
+    padding-bottom: 0;
 }
 
-.p-num {
-    width: 44px;
-    height: 44px;
+/* Vertical connector line */
+.hiw-connector {
+    position: absolute;
+    left: 23px;
+    top: 48px;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(180deg, rgba(0, 150, 45, 0.4), rgba(0, 150, 45, 0.05));
+}
+
+/* Step number badge */
+.hiw-num {
+    width: 48px;
+    height: 48px;
     background: linear-gradient(135deg, #00962d 0%, #00c93a 100%);
-    color: white;
-    border-radius: 50%;
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 1.125rem;
     font-weight: 800;
-    margin: 0 auto 12px;
-    box-shadow: 0 4px 12px rgba(0, 150, 45, 0.3);
-    transition: none;
-}
-
-.p-step h4 {
-    font-size: 0.938rem;
-    font-weight: 700;
-    margin-bottom: 4px;
-    color: white;
-}
-
-.p-step p {
-    font-size: 0.813rem;
-    color: rgba(255, 255, 255, 0.6);
-    margin: 0;
-}
-
-.p-line {
-    width: 32px;
-    height: 2px;
-    background: linear-gradient(90deg, #00962d 0%, rgba(255, 255, 255, 0.1) 100%);
+    color: #fff;
+    position: relative;
+    z-index: 2;
+    box-shadow:
+        0 4px 16px rgba(0, 150, 45, 0.3),
+        0 0 40px rgba(0, 201, 58, 0.08);
     flex-shrink: 0;
+}
+
+/* Card */
+.hiw-card {
+    padding: 24px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 14px;
+    transition: border-color 0.25s ease, background 0.25s ease;
+}
+
+.hiw-card:hover {
+    border-color: rgba(0, 201, 58, 0.15);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+/* Icon inside card */
+.hiw-icon {
+    width: 44px;
+    height: 44px;
+    background: rgba(0, 150, 45, 0.1);
+    border: 1px solid rgba(0, 150, 45, 0.15);
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #00c93a;
+    margin-bottom: 14px;
+}
+
+.hiw-card h3 {
+    font-size: 1.063rem;
+    font-weight: 700;
+    color: #fff;
+    margin: 0 0 8px;
+    letter-spacing: -0.01em;
+}
+
+.hiw-card p {
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.55);
+    margin: 0 0 14px;
+}
+
+/* Tags */
+.hiw-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.hiw-tags span {
+    padding: 3px 10px;
+    background: rgba(0, 150, 45, 0.08);
+    border: 1px solid rgba(0, 150, 45, 0.12);
+    border-radius: 100px;
+    font-size: 0.688rem;
+    font-weight: 600;
+    color: rgba(0, 201, 58, 0.8);
+    letter-spacing: 0.01em;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .hiw-step {
+        grid-template-columns: 40px 1fr;
+        gap: 16px;
+    }
+
+    .hiw-num {
+        width: 40px;
+        height: 40px;
+        font-size: 1rem;
+        border-radius: 12px;
+    }
+
+    .hiw-connector {
+        left: 19px;
+        top: 40px;
+    }
+
+    .hiw-card {
+        padding: 18px;
+    }
 }
 
 /* ========================================

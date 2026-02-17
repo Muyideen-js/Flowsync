@@ -1,5 +1,5 @@
 /* ───────────────────────────────────────────
-   SCHEDULE PAGE
+   SCHEDULER PAGE
    ─────────────────────────────────────────── */
 
 .anim-s {
@@ -17,19 +17,20 @@
 }
 
 .sched {
-    max-width: 900px;
+    max-width: 1100px;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 20px;
 }
 
 /* ── Header ───────────────────────────────── */
 
 .sc-head {
     display: flex;
-    align-items: center;
+    align-items: flex-start;
     justify-content: space-between;
+    gap: 16px;
 }
 
 .sc-head h1 {
@@ -46,19 +47,56 @@
     margin: 0;
 }
 
+.sc-head-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* View switcher */
+.sc-view-switcher {
+    display: flex;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.sc-view-btn {
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.45);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-family: inherit;
+}
+
+.sc-view-btn:hover {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.sc-view-btn.active {
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
 .sc-new-btn {
     display: flex;
     align-items: center;
     gap: 6px;
     padding: 8px 16px;
-    border-radius: 8px;
-    background: var(--accent);
+    background: var(--accent, #00c93a);
     border: none;
+    border-radius: 8px;
     color: #000;
     font-size: 13px;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.15s ease;
+    font-family: inherit;
 }
 
 .sc-new-btn:hover {
@@ -66,110 +104,181 @@
     transform: translateY(-1px);
 }
 
+/* ── Stats Strip ──────────────────────────── */
+
+.sc-stats {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 16px 22px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 12px;
+}
+
+.sc-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.sc-stat-val {
+    font-size: 20px;
+    font-weight: 700;
+    color: #f5f5f5;
+}
+
+.sc-failed-val {
+    color: #ff6b6b;
+}
+
+.sc-stat-label {
+    font-size: 11.5px;
+    color: rgba(255, 255, 255, 0.4);
+    font-weight: 500;
+}
+
+.sc-stat-div {
+    width: 1px;
+    height: 28px;
+    background: rgba(255, 255, 255, 0.08);
+}
+
 /* ── Tabs ──────────────────────────────────── */
 
 .sc-tabs {
     display: flex;
     gap: 4px;
-    padding: 4px;
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.06);
     border-radius: 10px;
+    padding: 4px;
 }
 
 .sc-tab {
-    flex: 1;
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 9px 16px;
+    gap: 6px;
+    padding: 8px 16px;
     border-radius: 8px;
     background: transparent;
     border: none;
+    color: rgba(255, 255, 255, 0.5);
     font-size: 13px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.45);
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.15s ease;
+    font-family: inherit;
     text-transform: capitalize;
 }
 
 .sc-tab:hover {
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.8);
 }
 
 .sc-tab.active {
-    background: rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.08);
     color: #fff;
-    font-weight: 600;
 }
+
+.sc-tab.has-failed .sc-tab-count {
+    background: rgba(255, 107, 107, 0.15);
+    color: #ff6b6b;
+}
+
+.sc-tab-name {}
 
 .sc-tab-count {
     font-size: 11px;
     font-weight: 700;
-    background: rgba(255, 255, 255, 0.06);
-    padding: 1px 7px;
+    padding: 2px 7px;
     border-radius: 100px;
-    color: rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.5);
 }
 
-.sc-tab.active .sc-tab-count {
-    background: rgba(0, 201, 58, 0.12);
-    color: var(--accent-light);
-}
-
-/* ── Post list ────────────────────────────── */
+/* ── Post List ────────────────────────────── */
 
 .sc-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
 .sc-empty {
     text-align: center;
-    padding: 48px 0;
-    color: rgba(255, 255, 255, 0.3);
+    padding: 60px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.sc-empty p {
     font-size: 14px;
+    color: rgba(255, 255, 255, 0.5);
+    margin: 0;
+    font-weight: 500;
+}
+
+.sc-empty span {
+    font-size: 12.5px;
+    color: rgba(255, 255, 255, 0.3);
 }
 
 .sc-post {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px 18px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 12px;
-    transition: all 0.2s ease;
     gap: 16px;
+    padding: 14px 18px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    transition: all 0.15s ease;
+    animation: post-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+    animation-delay: calc(var(--j, 0) * 0.04s);
+}
+
+@keyframes post-in {
+    0% {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .sc-post:hover {
-    background: rgba(255, 255, 255, 0.05);
     border-color: rgba(255, 255, 255, 0.1);
-    transform: translateX(3px);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.sc-post.failed-post {
+    border-color: rgba(255, 107, 107, 0.15);
+    background: rgba(255, 107, 107, 0.03);
 }
 
 .sc-post-left {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     gap: 14px;
     flex: 1;
     min-width: 0;
 }
 
 .sc-badge {
-    flex-shrink: 0;
     font-size: 10px;
     font-weight: 700;
     padding: 4px 10px;
-    border-radius: 6px;
-    background: color-mix(in srgb, var(--ch) 12%, transparent);
+    border-radius: 100px;
+    background: color-mix(in srgb, var(--ch) 14%, transparent);
     color: var(--ch);
-    letter-spacing: 0.03em;
-    margin-top: 2px;
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .sc-post-info {
@@ -179,7 +288,6 @@
 
 .sc-post-text {
     font-size: 13.5px;
-    font-weight: 500;
     color: rgba(255, 255, 255, 0.8);
     margin: 0 0 6px;
     line-height: 1.4;
@@ -192,134 +300,395 @@
     display: flex;
     align-items: center;
     gap: 10px;
+    flex-wrap: wrap;
+}
+
+.sc-post-type {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.45);
 }
 
 .sc-post-date {
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 4px;
     font-size: 12px;
     color: rgba(255, 255, 255, 0.35);
 }
 
 .sc-status {
-    font-size: 10.5px;
-    font-weight: 650;
-    padding: 2px 8px;
-    border-radius: 4px;
-    text-transform: capitalize;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--st);
 }
 
-.sc-status.scheduled {
-    background: rgba(0, 201, 58, 0.1);
-    color: var(--accent-light);
-}
-
-.sc-status.queued {
-    background: rgba(29, 161, 242, 0.1);
-    color: #5bb8f5;
-}
-
-.sc-status.draft {
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.4);
-}
-
-/* Actions */
 .sc-post-actions {
     display: flex;
     gap: 6px;
     flex-shrink: 0;
-    opacity: 0;
-    transition: opacity 0.15s ease;
-}
-
-.sc-post:hover .sc-post-actions {
-    opacity: 1;
 }
 
 .sc-action {
-    font-size: 12px;
-    font-weight: 600;
     padding: 5px 12px;
     border-radius: 6px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 12px;
+    font-weight: 500;
     cursor: pointer;
     transition: all 0.15s ease;
+    font-family: inherit;
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .sc-action:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff;
+    border-color: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.sc-action.danger {
+    color: rgba(255, 107, 107, 0.6);
 }
 
 .sc-action.danger:hover {
-    background: rgba(255, 68, 68, 0.1);
-    border-color: rgba(255, 68, 68, 0.2);
+    background: rgba(255, 107, 107, 0.08);
+    border-color: rgba(255, 107, 107, 0.2);
     color: #ff6b6b;
 }
 
-/* ── Summary strip ────────────────────────── */
+.sc-action.retry {
+    background: rgba(255, 167, 38, 0.08);
+    border-color: rgba(255, 167, 38, 0.2);
+    color: #ffa726;
+}
 
+.sc-action.retry:hover {
+    background: rgba(255, 167, 38, 0.14);
+}
+
+/* ── Calendar View ────────────────────────── */
+
+.sc-calendar {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 14px;
+    padding: 22px;
+}
+
+.sc-cal-header {
+    margin-bottom: 18px;
+}
+
+.sc-cal-header h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #f5f5f5;
+    margin: 0;
+}
+
+.sc-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+}
+
+.sc-cal-day-header {
+    padding: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.35);
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.sc-cal-cell {
+    min-height: 90px;
+    padding: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+    transition: all 0.15s ease;
+}
+
+.sc-cal-cell:hover:not(.empty) {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.08);
+}
+
+.sc-cal-cell.empty {
+    opacity: 0.3;
+}
+
+.sc-cal-cell.today {
+    border-color: rgba(0, 150, 45, 0.25);
+    background: rgba(0, 150, 45, 0.04);
+}
+
+.sc-cal-num {
+    font-size: 12px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.6);
+    display: block;
+    margin-bottom: 6px;
+}
+
+.sc-cal-cell.today .sc-cal-num {
+    color: var(--accent, #00c93a);
+}
+
+.sc-cal-posts {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.sc-cal-post {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 5px;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--ch) 8%, transparent);
+    overflow: hidden;
+}
+
+.sc-cal-badge {
+    font-size: 8px;
+    font-weight: 700;
+    color: var(--ch);
+    flex-shrink: 0;
+}
+
+.sc-cal-text {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sc-cal-more {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.35);
+    padding: 2px 5px;
+}
+
+/* ── Timeline View ────────────────────────── */
+
+.sc-timeline {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 14px;
+    padding: 22px;
+}
+
+.sc-tl-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.sc-tl-header h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #f5f5f5;
+    margin: 0;
+}
+
+.sc-tl-date {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.sc-tl-track {
+    display: flex;
+    flex-direction: column;
+}
+
+.sc-tl-row {
+    display: grid;
+    grid-template-columns: 80px 24px 1fr;
+    gap: 12px;
+    padding: 10px 0;
+    align-items: start;
+    min-height: 44px;
+}
+
+.sc-tl-time {
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.35);
+    text-align: right;
+    padding-top: 2px;
+}
+
+.sc-tl-row.has-posts .sc-tl-time {
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 600;
+}
+
+.sc-tl-line {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    height: 100%;
+    min-height: 24px;
+}
+
+.sc-tl-line::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.sc-tl-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.06);
+    position: relative;
+    z-index: 1;
+    flex-shrink: 0;
+}
+
+.sc-tl-row.has-posts .sc-tl-dot {
+    background: var(--accent, #00c93a);
+    border-color: rgba(0, 150, 45, 0.3);
+    box-shadow: 0 0 8px rgba(0, 150, 45, 0.3);
+}
+
+.sc-tl-content {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.sc-tl-empty-slot {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.15);
+}
+
+.sc-tl-card {
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-left: 3px solid var(--ch, rgba(255, 255, 255, 0.1));
+    border-radius: 8px;
+    transition: all 0.15s ease;
+}
+
+.sc-tl-card:hover {
+    border-color: rgba(255, 255, 255, 0.1);
+    border-left-color: var(--ch, rgba(255, 255, 255, 0.2));
+    background: rgba(255, 255, 255, 0.04);
+}
+
+.sc-tl-card-head {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.sc-tl-type {
+    font-size: 11px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.45);
+}
+
+.sc-tl-card-text {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.7);
+    margin: 0;
+    line-height: 1.5;
+}
+
+/* ── Summary strip (backwards compat) ── */
 .sc-summary {
     display: flex;
     align-items: center;
-    justify-content: center;
-    gap: 28px;
-    padding: 18px;
+    gap: 20px;
+    padding: 16px 22px;
     background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.07);
     border-radius: 12px;
 }
 
 .sc-sum-item {
     display: flex;
     flex-direction: column;
-    align-items: center;
     gap: 2px;
 }
 
 .sc-sum-val {
     font-size: 20px;
-    font-weight: 800;
-    color: #fff;
-    letter-spacing: -0.03em;
+    font-weight: 700;
+    color: #f5f5f5;
 }
 
 .sc-sum-label {
-    font-size: 11px;
+    font-size: 11.5px;
+    color: rgba(255, 255, 255, 0.4);
     font-weight: 500;
-    color: rgba(255, 255, 255, 0.35);
-    text-transform: capitalize;
 }
 
 .sc-sum-divider {
     width: 1px;
-    height: 32px;
+    height: 28px;
     background: rgba(255, 255, 255, 0.08);
 }
 
 /* ── Responsive ───────────────────────────── */
 
-@media (max-width: 640px) {
+@media (max-width: 900px) {
     .sc-head {
         flex-direction: column;
-        align-items: flex-start;
+    }
+
+    .sc-head-right {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .sc-stats {
+        flex-wrap: wrap;
         gap: 12px;
     }
 
+    .sc-cal-cell {
+        min-height: 60px;
+        padding: 4px;
+    }
+
+    .sc-cal-text {
+        display: none;
+    }
+
+    .sc-tl-row {
+        grid-template-columns: 60px 20px 1fr;
+    }
+}
+
+@media (max-width: 600px) {
     .sc-post {
         flex-direction: column;
-        align-items: flex-start;
+        align-items: stretch;
     }
 
     .sc-post-actions {
-        opacity: 1;
-    }
-
-    .sc-post-text {
-        white-space: normal;
+        justify-content: flex-end;
     }
 }

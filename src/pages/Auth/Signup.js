@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import Button from '../../components/Button/Button';
+import { createUserWithEmailAndPassword, updateProfile, signInWithPopup } from 'firebase/auth';
+import { auth, googleProvider, githubProvider } from '../../firebase';
 import './Login.css';
 
 const Signup = () => {
@@ -13,6 +14,8 @@ const Signup = () => {
         terms: false
     });
     const [currentAd, setCurrentAd] = useState(0);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
 
     const ads = [
         {
@@ -54,21 +57,73 @@ const Signup = () => {
         return () => clearInterval(interval);
     }, []);
 
-    const handleSubmit = (e) => {
-        e.preventDefault();
-        if (formData.password !== formData.confirmPassword) {
-            alert('Passwords do not match');
-            return;
-        }
-        navigate('/dashboard');
-    };
-
     const handleChange = (e) => {
         const { name, value, type, checked } = e.target;
-        setFormData(prev => ({
-            ...prev,
-            [name]: type === 'checkbox' ? checked : value
-        }));
+        setFormData(prev => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+
+        if (formData.password !== formData.confirmPassword) {
+            setError('Passwords do not match');
+            return;
+        }
+        if (formData.password.length < 6) {
+            setError('Password must be at least 6 characters');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+            await updateProfile(userCredential.user, { displayName: formData.name });
+            navigate('/dashboard');
+        } catch (err) {
+            const code = err.code;
+            if (code === 'auth/email-already-in-use') {
+                setError('An account with this email already exists');
+            } else if (code === 'auth/weak-password') {
+                setError('Password is too weak');
+            } else if (code === 'auth/invalid-email') {
+                setError('Invalid email address');
+            } else {
+                setError('Something went wrong. Please try again.');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleGoogle = async () => {
+        setError('');
+        setLoading(true);
+        try {
+            await signInWithPopup(auth, googleProvider);
+            navigate('/dashboard');
+        } catch (err) {
+            if (err.code !== 'auth/popup-closed-by-user') {
+                setError('Google sign-in failed. Please try again.');
+            }
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleGithub = async () => {
+        setError('');
+        setLoading(true);
+        try {
+            await signInWithPopup(auth, githubProvider);
+            navigate('/dashboard');
+        } catch (err) {
+            if (err.code !== 'auth/popup-closed-by-user') {
+                setError('GitHub sign-in failed. Please try again.');
+            }
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -77,9 +132,8 @@ const Signup = () => {
             <div className="login-left">
                 <div className="ads-container">
                     <Link to="/" className="brand-logo">
-                        <div className="brand-icon">
-                            <div className="flow-circle"></div>
-                            <div className="flow-wave"></div>
+                        <div className="brand-f-avatar">
+                            <span>F</span>
                         </div>
                         <span className="brand-text">
                             Flow<span className="brand-accent">Sync</span>
@@ -88,10 +142,7 @@ const Signup = () => {
 
                     <div className="ad-carousel">
                         {ads.map((ad, index) => (
-                            <div
-                                key={index}
-                                className={`ad-slide ${index === currentAd ? 'active' : ''}`}
-                            >
+                            <div key={index} className={`ad-slide ${index === currentAd ? 'active' : ''}`}>
                                 <div className="ad-icon">{ad.icon}</div>
                                 <h2>{ad.title}</h2>
                                 <p>{ad.description}</p>
@@ -119,6 +170,8 @@ const Signup = () => {
                         <p>Get started with your free account</p>
                     </div>
 
+                    {error && <div className="auth-error">{error}</div>}
+
                     <form onSubmit={handleSubmit} className="auth-form">
                         <div className="input-group">
                             <label>Full Name</label>
@@ -129,6 +182,7 @@ const Signup = () => {
                                 onChange={handleChange}
                                 placeholder="John Doe"
                                 required
+                                disabled={loading}
                             />
                         </div>
 
@@ -141,6 +195,7 @@ const Signup = () => {
                                 onChange={handleChange}
                                 placeholder="you@example.com"
                                 required
+                                disabled={loading}
                             />
                         </div>
 
@@ -158,6 +213,7 @@ const Signup = () => {
                                     onChange={handleChange}
                                     placeholder="••••••••"
                                     required
+                                    disabled={loading}
                                 />
                             </div>
                         </div>
@@ -176,24 +232,19 @@ const Signup = () => {
                                     onChange={handleChange}
                                     placeholder="••••••••"
                                     required
+                                    disabled={loading}
                                 />
                             </div>
                         </div>
 
                         <label className="check-label">
-                            <input
-                                type="checkbox"
-                                name="terms"
-                                checked={formData.terms}
-                                onChange={handleChange}
-                                required
-                            />
+                            <input type="checkbox" name="terms" checked={formData.terms} onChange={handleChange} required />
                             <span>I agree to the Terms and Privacy Policy</span>
                         </label>
 
-                        <Button type="submit" size="medium" className="submit-btn">
-                            Create Account
-                        </Button>
+                        <button type="submit" className="submit-btn" disabled={loading}>
+                            {loading ? <span className="btn-spinner" /> : 'Create Account'}
+                        </button>
                     </form>
 
                     <div className="divider-line">
@@ -201,7 +252,7 @@ const Signup = () => {
                     </div>
 
                     <div className="social-buttons">
-                        <button className="social-button">
+                        <button className="social-button" onClick={handleGoogle} disabled={loading}>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
                                 <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
@@ -210,7 +261,7 @@ const Signup = () => {
                             </svg>
                             Google
                         </button>
-                        <button className="social-button">
+                        <button className="social-button" onClick={handleGithub} disabled={loading}>
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
                                 <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
                             </svg>

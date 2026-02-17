@@ -1,27 +1,45 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 import MainLayout from '../../components/Layout/MainLayout';
 import './CommandCenter.css';
 
 /* ── Tiny inline icons for this page only ── */
 const Ic = {
     check: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M13 4L6.5 11 3 7.5" /></svg>,
-    arrow: <svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2 14L8 4l6 10" /><path d="M5 9h6" /></svg>,
-    dollar: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M8 1v14M12 4H6.5a2.5 2.5 0 000 5h3a2.5 2.5 0 010 5H4" /></svg>,
-    rocket: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M9.5 11.5l-3-3a14 14 0 014-6c2 0 3 1 3 3a14 14 0 01-6 4z" /><circle cx="11" cy="5" r="1" fill="currentColor" stroke="none" /></svg>,
-    star: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 1l2.2 4.5 5 .7-3.6 3.5.8 5L8 12.5 3.6 14.7l.8-5L.8 6.2l5-.7L8 1z" /></svg>,
-    alert: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M6.86 2.57l-5.71 10A1.14 1.14 0 002.14 14h11.43a1.14 1.14 0 001-1.71l-5.72-10a1.14 1.14 0 00-1.99 0z" /><path d="M8 6v3M8 11.5h.01" /></svg>,
+    dollar: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M8 1v14M11.5 4H6.25a2.25 2.25 0 000 4.5h3.5a2.25 2.25 0 010 4.5H4" /></svg>,
+    rocket: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 10l-4 4M6 10l-4 4" /><path d="M13.5 2.5s.5 3-2 5.5L8 11 5 8l3-3.5c2.5-2.5 5.5-2 5.5-2z" /></svg>,
+    star: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"><path d="M8 1l2.1 4.3 4.9.7-3.5 3.4.8 4.6L8 11.8 3.7 14l.8-4.6L1 6l4.9-.7z" /></svg>,
+    alert: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M8 5.5v3M8 11h.01" /><path d="M7.134 2.5a1 1 0 011.732 0l5.196 9a1 1 0 01-.866 1.5H2.804a1 1 0 01-.866-1.5l5.196-9z" /></svg>,
     plus: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M8 3v10M3 8h10" /></svg>,
-    msg: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 10a1.5 1.5 0 01-1.5 1.5H4.5L2 14V3.5A1.5 1.5 0 013.5 2h9A1.5 1.5 0 0114 3.5V10z" /></svg>,
+    msg: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M14 10a1.5 1.5 0 01-1.5 1.5H5L2 14.5v-11A1.5 1.5 0 013.5 2h9A1.5 1.5 0 0114 3.5V10z" /></svg>,
     zap: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8.5 1L2 9h5.5L7 15l7-8H8.5L8.5 1z" /></svg>,
+    logout: <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 14H3.5A1.5 1.5 0 012 12.5v-9A1.5 1.5 0 013.5 2H6" /><path d="M10.5 11.5L14 8l-3.5-3.5" /><path d="M14 8H6" /></svg>,
 };
 
 const CommandCenter = () => {
     const [loaded, setLoaded] = useState(false);
+    const { user, logout } = useAuth();
+    const navigate = useNavigate();
 
     useEffect(() => {
         // trigger stagger animation on mount
         requestAnimationFrame(() => setLoaded(true));
     }, []);
+
+    const getGreeting = () => {
+        const h = new Date().getHours();
+        if (h < 12) return 'Good morning';
+        if (h < 18) return 'Good afternoon';
+        return 'Good evening';
+    };
+
+    const displayName = user?.displayName || user?.email?.split('@')[0] || 'User';
+
+    const handleLogout = async () => {
+        await logout();
+        navigate('/login');
+    };
 
     const todaysPlan = [
         { id: 1, task: "Post 1 Reel on Instagram at 7:30 PM", channel: "instagram", priority: "high", done: false },
@@ -74,11 +92,19 @@ const CommandCenter = () => {
 
     return (
         <MainLayout>
-            <div className={`overview ${loaded ? 'loaded' : ''}`}>
+            <div className={`overview ${loaded ? 'loaded' : ''} `}>
                 {/* ── Greeting ── */}
                 <div className="ov-greeting anim-item" style={{ '--i': 0 }}>
-                    <h1>Good afternoon</h1>
-                    <p>Here's what's happening across your channels today.</p>
+                    <div className="greeting-top">
+                        <div>
+                            <h1>{getGreeting()}, {displayName}</h1>
+                            <p>Here's what's happening across your channels today.</p>
+                        </div>
+                        <button className="logout-btn" onClick={handleLogout} title="Sign out">
+                            {Ic.logout}
+                            <span>Sign out</span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* ── KPI strip ── */}
@@ -87,7 +113,7 @@ const CommandCenter = () => {
                         <div key={idx} className="kpi">
                             <span className="kpi-label">{k.title}</span>
                             <span className="kpi-val">{k.value}</span>
-                            <span className={`kpi-delta ${k.up ? 'up' : 'down'}`}>
+                            <span className={`kpi - delta ${k.up ? 'up' : 'down'} `}>
                                 {k.up ? '↑' : '•'} {k.change} <span className="kpi-sub">{k.sub}</span>
                             </span>
                         </div>
@@ -118,15 +144,15 @@ const CommandCenter = () => {
                         </div>
                         <div className="plan-list">
                             {todaysPlan.map((item, idx) => (
-                                <div key={item.id} className={`plan-row ${item.done ? 'done' : ''}`} style={{ '--j': idx }}>
-                                    <div className={`plan-check ${item.done ? 'checked' : ''}`}>
+                                <div key={item.id} className={`plan - row ${item.done ? 'done' : ''} `} style={{ '--j': idx }}>
+                                    <div className={`plan - check ${item.done ? 'checked' : ''} `}>
                                         {item.done && Ic.check}
                                     </div>
                                     <div className="plan-info">
                                         <p>{item.task}</p>
                                         <div className="plan-tags">
-                                            <span className={`tag-priority ${item.priority}`}>{item.priority}</span>
-                                            <span className={`tag-channel ${item.channel}`}>{item.channel}</span>
+                                            <span className={`tag - priority ${item.priority} `}>{item.priority}</span>
+                                            <span className={`tag - channel ${item.channel} `}>{item.channel}</span>
                                         </div>
                                     </div>
                                     <button className="plan-go">Go</button>
@@ -163,18 +189,18 @@ const CommandCenter = () => {
                     </div>
                     <div className="ov-signals">
                         {signals.map((s, idx) => (
-                            <div key={idx} className={`sig ${s.type}`} style={{ '--j': idx }}>
+                            <div key={idx} className={`sig ${s.type} `} style={{ '--j': idx }}>
                                 <div className="sig-top">
                                     <div className="sig-label">
                                         <span className="sig-icon">{s.icon}</span>
                                         <span>{s.label}</span>
                                     </div>
-                                    <span className={`sig-badge ${s.badgeClass}`}>{s.badge}</span>
+                                    <span className={`sig - badge ${s.badgeClass} `}>{s.badge}</span>
                                 </div>
 
                                 {s.name && (
                                     <div className="sig-from">
-                                        <div className={`sig-avatar ${s.vip ? 'vip' : ''}`}>{s.initials}</div>
+                                        <div className={`sig - avatar ${s.vip ? 'vip' : ''} `}>{s.initials}</div>
                                         <div>
                                             <span className="sig-name">{s.name}{s.vip && <span className="sig-verified">✓</span>}</span>
                                             <span className="sig-handle">{s.handle}</span>
@@ -198,11 +224,11 @@ const CommandCenter = () => {
                                 <div className="sig-foot">
                                     <div className="sig-meta">
                                         <span className="sig-time">{s.time}</span>
-                                        <span className={`sig-tag ${s.tagClass}`}>{s.tag}</span>
+                                        <span className={`sig - tag ${s.tagClass} `}>{s.tag}</span>
                                     </div>
                                     <div className="sig-actions">
                                         {s.actions.map((a, i) => (
-                                            <button key={i} className={`sig-btn ${i === 0 ? 'primary' : ''}`}>{a}</button>
+                                            <button key={i} className={`sig - btn ${i === 0 ? 'primary' : ''} `}>{a}</button>
                                         ))}
                                     </div>
                                 </div>
