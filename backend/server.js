@@ -44,6 +44,8 @@ const CALLBACK_URL = process.env.VERCEL_URL
 
 let whatsappClient = null;
 let isWhatsAppReady = false;
+let lastQr = null;          // ← cached so new sockets get it instantly
+let isInitializing = false; // ← prevents parallel Puppeteer launches
 
 
 
@@ -60,13 +62,16 @@ const initWhatsApp = async () => {
     });
 
     whatsappClient.on('qr', (qr) => {
-        console.log('QR Code generated');
+        console.log('QR Code generated at', Date.now());
+        lastQr = qr; // ← cache it
         io.emit('qr_code', qr);
     });
 
     whatsappClient.on('ready', () => {
         console.log('WhatsApp Client is ready!');
         isWhatsAppReady = true;
+        lastQr = null; // QR no longer needed once authenticated
+        isInitializing = false;
         io.emit('whatsapp_ready');
     });
 
@@ -85,6 +90,8 @@ const initWhatsApp = async () => {
         console.log('WhatsApp Disconnected:', reason);
         whatsappClient = null;
         isWhatsAppReady = false;
+        lastQr = null;
+        isInitializing = false;
         io.emit('whatsapp_disconnected');
     });
 
@@ -113,7 +120,8 @@ const initWhatsApp = async () => {
         await whatsappClient.initialize();
     } catch (err) {
         console.error('Failed to initialize WhatsApp client:', err.message);
-        whatsappClient = null; // Reset on failure
+        whatsappClient = null;
+        isInitializing = false;
         io.emit('error', 'Failed to initialize WhatsApp. Please restart the backend.');
     }
 };
@@ -122,49 +130,193 @@ const initWhatsApp = async () => {
 io.on('connection', (socket) => {
     console.log('New client connected:', socket.id);
 
-    // Send current WhatsApp status immediately on connect
+    // ① Always send current WA status immediately
+    socket.emit('whatsapp_status', { initialized: !!whatsappClient, ready: isWhatsAppReady });
+
+    // ② If ready, let the client know right away
     if (isWhatsAppReady) {
         socket.emit('whatsapp_ready');
         socket.emit('whatsapp_authenticated');
     }
 
-    socket.on('start_whatsapp', () => {
-        if (whatsappClient) {
-            // Already initialized — send current status
+    // ③ If not ready but we have a cached QR, send it instantly
+    //    so the user doesn't wait 15-20s for the next refresh cycle
+    if (!isWhatsAppReady && lastQr) {
+        console.log('[WA] Sending cached QR to new client');
+        socket.emit('qr_code', lastQr);
+    }
+
+    /* start_whatsapp — supports ack callback for instant UI feedback */
+    socket.on('start_whatsapp', async (ack) => {
+        try {
             if (isWhatsAppReady) {
                 socket.emit('whatsapp_ready');
                 socket.emit('whatsapp_authenticated');
+                return typeof ack === 'function' && ack({ ok: true, ready: true });
             }
-        } else {
-            initWhatsApp();
+
+            // Send cached QR right now if we have one
+            if (lastQr) {
+                socket.emit('qr_code', lastQr);
+            }
+
+            // Start client if not already running
+            if (!whatsappClient && !isInitializing) {
+                isInitializing = true;
+                initWhatsApp(); // non-blocking — QR arrives via event
+            }
+
+            return typeof ack === 'function' && ack({ ok: true, ready: false, hasQr: !!lastQr });
+        } catch (e) {
+            isInitializing = false;
+            console.error('start_whatsapp error:', e);
+            socket.emit('whatsapp_auth_failure', e.message);
+            return typeof ack === 'function' && ack({ ok: false, error: e.message });
         }
     });
 
     socket.on('get_whatsapp_status', () => {
-        socket.emit('whatsapp_status', {
-            initialized: !!whatsappClient,
-            ready: isWhatsAppReady
-        });
+        socket.emit('whatsapp_status', { initialized: !!whatsappClient, ready: isWhatsAppReady });
+        // Also send cached QR on status request
+        if (!isWhatsAppReady && lastQr) socket.emit('qr_code', lastQr);
+    });
+
+    /* ── connect_telegram: verify bot token and mark connected ── */
+    socket.on('connect_telegram', async () => {
+        try {
+            const res = await axios.get(
+                `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getMe`
+            );
+            if (res.data?.ok) {
+                const bot = res.data.result;
+                console.log(`[TG] Bot verified: @${bot.username}`);
+                socket.emit('telegram_connected', {
+                    username: bot.username,
+                    firstName: bot.first_name,
+                    chatId: process.env.TELEGRAM_CHAT_ID || null
+                });
+            } else {
+                socket.emit('telegram_connect_error', { error: 'Invalid bot token' });
+            }
+        } catch (err) {
+            console.error('[TG] connect_telegram error:', err.message);
+            socket.emit('telegram_connect_error', { error: err.message });
+        }
+    });
+
+    /* ── Send WhatsApp message ── */
+    socket.on('send_whatsapp_message', async ({ chatId, text }) => {
+        if (!whatsappClient || !isWhatsAppReady) {
+            socket.emit('send_message_error', { chatId, error: 'WhatsApp not ready' });
+            return;
+        }
+        try {
+            await whatsappClient.sendMessage(chatId, text);
+            console.log(`[WA] Sent to ${chatId}: ${text.substring(0, 40)}`);
+            socket.emit('send_message_ok', { chatId });
+        } catch (err) {
+            console.error('[WA] Send error:', err.message);
+            socket.emit('send_message_error', { chatId, error: err.message });
+        }
+    });
+
+    /* ── Telegram: fetch recent messages as inbox threads ── */
+    socket.on('get_telegram_messages', async () => {
+        try {
+            const res = await axios.get(
+                `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/getUpdates?limit=50&offset=-50`
+            );
+            const updates = res.data?.result || [];
+
+            // Group by chat id
+            const chatMap = {};
+            for (const upd of updates) {
+                const msg = upd.message || upd.channel_post;
+                if (!msg) continue;
+                const cid = String(msg.chat.id);
+                if (!chatMap[cid]) {
+                    chatMap[cid] = {
+                        id: `tg_${cid}`,
+                        platform: 'telegram',
+                        from: cid,
+                        name: msg.chat.first_name
+                            ? `${msg.chat.first_name}${msg.chat.last_name ? ' ' + msg.chat.last_name : ''}`
+                            : msg.chat.title || msg.chat.username || cid,
+                        avatar: (msg.chat.first_name || msg.chat.title || 'T').substring(0, 2).toUpperCase(),
+                        intent: 'general',
+                        vip: false,
+                        tags: [],
+                        messages: [],
+                        unread: false,
+                        flagged: false,
+                        telegramChatId: cid
+                    };
+                }
+                chatMap[cid].messages.push({
+                    text: msg.text || '(media)',
+                    time: new Date(msg.date * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    incoming: true
+                });
+            }
+
+            const threads = Object.values(chatMap);
+            socket.emit('telegram_threads', threads);
+        } catch (err) {
+            console.error('[TG] getUpdates error:', err.message);
+            socket.emit('telegram_error', { error: err.message });
+        }
+    });
+
+    /* ── Send Telegram message ── */
+    socket.on('send_telegram_message', async ({ telegramChatId, text }) => {
+        try {
+            await axios.post(
+                `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`,
+                { chat_id: telegramChatId, text }
+            );
+            console.log(`[TG] Sent to ${telegramChatId}: ${text.substring(0, 40)}`);
+            socket.emit('send_message_ok', { chatId: `tg_${telegramChatId}` });
+        } catch (err) {
+            console.error('[TG] Send error:', err.response?.data || err.message);
+            socket.emit('send_message_error', { chatId: `tg_${telegramChatId}`, error: err.message });
+        }
     });
 
     socket.on('get_whatsapp_chats', async () => {
         if (!whatsappClient || !isWhatsAppReady) {
             console.log('WhatsApp not ready yet, skipping chat fetch');
+            socket.emit('whatsapp_chats_error', { reason: 'not_ready' });
             return;
         }
         try {
             const chats = await whatsappClient.getChats();
-            const formattedChats = await Promise.all(
-                chats.filter(c => !c.isGroup).slice(0, 15).map(async (chat) => {
-                    const contact = await chat.getContact();
-                    const messages = await chat.fetchMessages({ limit: 5 });
+            const personalChats = chats.filter(c => !c.isGroup).slice(0, 15);
 
-                    return {
+            const formattedChats = [];
+            let processedCount = 0;
+            const totalChats = personalChats.length;
+
+            socket.emit('whatsapp_loading_progress', { current: 0, total: totalChats, message: 'Starting fetch...' });
+
+            for (const chat of personalChats) {
+                processedCount++;
+                try {
+                    socket.emit('whatsapp_loading_progress', {
+                        current: processedCount,
+                        total: totalChats,
+                        message: `Processing chat ${processedCount}/${totalChats}`
+                    });
+
+                    const contact = await chat.getContact();
+                    const messages = await chat.fetchMessages({ limit: 12 });
+                    const contactName = contact.name || contact.pushname || contact.number || 'Unknown';
+
+                    formattedChats.push({
                         id: chat.id._serialized,
                         platform: 'whatsapp',
-                        from: contact.number,
-                        name: contact.name || contact.pushname || contact.number,
-                        avatar: (contact.name || contact.pushname || contact.number || 'WA').substring(0, 2).toUpperCase(),
+                        from: contact.number || chat.id.user,
+                        name: contactName,
+                        avatar: contactName.substring(0, 2).toUpperCase(),
                         intent: 'general',
                         vip: false,
                         tags: [],
@@ -175,14 +327,35 @@ io.on('connection', (socket) => {
                         })),
                         unread: chat.unreadCount > 0,
                         flagged: false
-                    };
-                })
-            );
+                    });
+                } catch (chatErr) {
+                    console.error('Error processing individual chat:', chatErr.message);
+                }
+            }
 
             console.log(`Sending ${formattedChats.length} WhatsApp chats to client`);
             socket.emit('whatsapp_chats', formattedChats);
         } catch (error) {
-            console.error('Error fetching chats:', error);
+            console.error('Error fetching chats:', error.message);
+
+            if (error.message.includes('detached') || error.message.includes('Session closed') || error.message.includes('Protocol error')) {
+                console.log('WhatsApp session is stale, reinitializing...');
+                isWhatsAppReady = false;
+
+                try {
+                    await whatsappClient.destroy();
+                } catch (e) {
+                    console.log('Error destroying stale client:', e.message);
+                }
+                whatsappClient = null;
+
+                socket.emit('whatsapp_chats_error', { reason: 'session_stale', message: 'WhatsApp session expired. Reconnecting...' });
+                io.emit('whatsapp_disconnected');
+
+                initWhatsApp();
+            } else {
+                socket.emit('whatsapp_chats_error', { reason: 'fetch_failed', message: error.message });
+            }
         }
     });
 

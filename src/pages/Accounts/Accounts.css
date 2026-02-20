@@ -599,3 +599,71 @@
         transform: rotate(360deg);
     }
 }
+
+/* ── Skeleton loading cards ──────────────────── */
+
+@keyframes skel-pulse {
+
+    0%,
+    100% {
+        opacity: 0.4;
+    }
+
+    50% {
+        opacity: 0.15;
+    }
+}
+
+.acc-skeleton {
+    pointer-events: none;
+}
+
+.acc-skel-pill {
+    height: 22px;
+    width: 90px;
+    border-radius: 100px;
+    background: rgba(255, 255, 255, 0.1);
+    animation: skel-pulse 1.6s ease-in-out infinite;
+    margin-left: auto;
+}
+
+.acc-skel-bar {
+    height: 12px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    animation: skel-pulse 1.6s ease-in-out infinite;
+    animation-delay: 0.2s;
+    margin: 8px 0;
+}
+
+.acc-skel-bar.short {
+    width: 60%;
+    animation-delay: 0.4s;
+}
+
+/* ── WA Checking chip (lazy socket — card-level only) ── */
+
+.ac-status.checking {
+    color: rgba(255, 180, 0, 0.75);
+    border-color: rgba(255, 180, 0, 0.2);
+    background: rgba(255, 180, 0, 0.07);
+}
+
+.ac-status-dot.checking-dot {
+    background: #ffb400;
+    animation: checking-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes checking-pulse {
+
+    0%,
+    100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+
+    50% {
+        opacity: 0.35;
+        transform: scale(0.7);
+    }
+}

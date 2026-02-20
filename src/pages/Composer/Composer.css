@@ -1,309 +1,426 @@
-/* ───────────────────────────────────────────
-   COMPOSER — AI Content Studio
-   ─────────────────────────────────────────── */
+/* ────────────────────────────────────────────────────────────
+   COMPOSER — Full Studio Redesign
+   No linear-gradient. Uses rgba() / color-mix() only.
+──────────────────────────────────────────────────────────── */
 
+/* ── Entrance animation ───────────────────────────────── */
 .anim-c {
     opacity: 0;
-    transform: translateY(16px);
+    transform: translateY(14px);
     transition:
-        opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-        transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-    transition-delay: calc(var(--i, 0) * 0.08s);
+        opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: calc(var(--i, 0) * 0.07s);
 }
 
-.composer.loaded .anim-c {
+.cs-root.loaded .anim-c {
     opacity: 1;
     transform: translateY(0);
 }
 
-.composer {
-    max-width: 1100px;
-    margin: 0 auto;
+/* ── Root layout ────────────────────────────────────────── */
+.cs-root {
     display: flex;
-    flex-direction: column;
-    gap: 28px;
+    gap: 0;
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
     position: relative;
 }
 
-/* ── Header ───────────────────────────────── */
-
-.cmp-head {
+/* ══════════════════════════════════════════════════════════
+   WORKSPACE (left column)
+══════════════════════════════════════════════════════════ */
+.cs-workspace {
+    flex: 1;
     display: flex;
-    align-items: flex-start;
+    flex-direction: column;
+    min-height: 0;
+    min-width: 0;
+    border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ── Top bar ──────────────────────────────────────────── */
+.cs-topbar {
+    display: flex;
+    align-items: center;
     justify-content: space-between;
-    gap: 16px;
+    padding: 14px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    flex-shrink: 0;
+    gap: 12px;
+    flex-wrap: wrap;
 }
 
-.cmp-head h1 {
-    font-size: 22px;
-    font-weight: 700;
-    color: #f5f5f5;
-    letter-spacing: -0.03em;
-    margin: 0 0 4px;
+/* Tab switcher */
+.cs-tabs {
+    display: flex;
+    gap: 4px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 10px;
+    padding: 3px;
 }
 
-.cmp-head p {
-    font-size: 13.5px;
-    color: rgba(255, 255, 255, 0.45);
-    margin: 0;
+.cs-tab {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 16px;
+    border-radius: 7px;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
 
-/* Brand voice toggle */
-.cmp-brand-toggle {
+.cs-tab svg {
+    opacity: 0.6;
+    flex-shrink: 0;
+}
+
+.cs-tab:hover {
+    color: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.cs-tab.active {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.cs-tab-ai.active {
+    background: rgba(138, 43, 226, 0.18);
+    color: #c9a0ff;
+    border: 1px solid rgba(138, 43, 226, 0.2);
+}
+
+.cs-tab-ai.active svg {
+    opacity: 1;
+    stroke: #c9a0ff;
+}
+
+/* Right side of topbar */
+.cs-topbar-right {
     display: flex;
     align-items: center;
     gap: 10px;
+}
+
+/* Brand voice toggle */
+.cs-brand-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
     cursor: pointer;
-    position: relative;
+    user-select: none;
 }
 
-.cmp-brand-toggle input {
-    position: absolute;
-    opacity: 0;
-    width: 0;
-    height: 0;
+.cs-brand-toggle input {
+    display: none;
 }
 
-.cmp-brand-slider {
-    width: 36px;
-    height: 20px;
-    background: rgba(255, 255, 255, 0.1);
+.cs-brand-track {
+    width: 30px;
+    height: 17px;
     border-radius: 100px;
+    background: rgba(255, 255, 255, 0.08);
     position: relative;
     transition: background 0.25s ease;
     flex-shrink: 0;
 }
 
-.cmp-brand-slider::after {
+.cs-brand-track::after {
     content: '';
     position: absolute;
-    top: 3px;
-    left: 3px;
-    width: 14px;
-    height: 14px;
+    top: 2.5px;
+    left: 2.5px;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.5);
+    background: rgba(255, 255, 255, 0.35);
     transition: transform 0.25s ease, background 0.25s ease;
 }
 
-.cmp-brand-toggle input:checked + .cmp-brand-slider {
-    background: rgba(138, 43, 226, 0.35);
+.cs-brand-toggle input:checked+.cs-brand-track {
+    background: rgba(138, 43, 226, 0.4);
 }
 
-.cmp-brand-toggle input:checked + .cmp-brand-slider::after {
-    transform: translateX(16px);
-    background: #b78aff;
+.cs-brand-toggle input:checked+.cs-brand-track::after {
+    transform: translateX(13px);
+    background: #c9a0ff;
 }
 
-.cmp-brand-label {
+.cs-brand-text {
     display: flex;
     align-items: center;
     gap: 5px;
     font-size: 12.5px;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.5);
-    white-space: nowrap;
-    transition: color 0.2s;
+    color: rgba(255, 255, 255, 0.45);
+    transition: color 0.2s ease;
 }
 
-.cmp-brand-toggle input:checked ~ .cmp-brand-label {
-    color: #b78aff;
+.cs-brand-toggle:has(input:checked) .cs-brand-text {
+    color: #c9a0ff;
 }
 
-/* ── Layout ───────────────────────────────── */
-
-.cmp-layout {
-    display: grid;
-    grid-template-columns: 1fr 320px;
-    gap: 16px;
-    align-items: start;
+.cs-brand-text svg {
+    stroke: currentColor;
 }
 
-/* ── Editor ───────────────────────────────── */
-
-.cmp-editor {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 14px;
-    padding: 22px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-/* Channels */
-.cmp-channels {
+/* Preview button */
+.cs-preview-btn {
     display: flex;
     align-items: center;
-    gap: 12px;
-}
-
-.cmp-label {
-    font-size: 12px;
+    gap: 6px;
+    padding: 7px 14px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 12.5px;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.4);
-    white-space: nowrap;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
 
-.cmp-ch-row {
+.cs-preview-btn svg {
+    stroke: currentColor;
+}
+
+.cs-preview-btn:hover,
+.cs-preview-btn.active {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: #fff;
+}
+
+/* ── Channel / Type bar ───────────────────────────────── */
+.cs-channel-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    flex-shrink: 0;
+    flex-wrap: wrap;
+}
+
+.cs-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.25);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.cs-label-gap {
+    margin-left: 6px;
+}
+
+.cs-channels {
     display: flex;
     gap: 6px;
 }
 
-.cmp-ch {
-    font-size: 11px;
-    font-weight: 700;
+.cs-ch {
+    position: relative;
     padding: 5px 14px;
     border-radius: 100px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+    border: 1.5px solid rgba(255, 255, 255, 0.07);
     background: rgba(255, 255, 255, 0.03);
-    color: rgba(255, 255, 255, 0.45);
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 11.5px;
+    font-weight: 700;
+    font-family: inherit;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all 0.18s ease;
+    letter-spacing: 0.02em;
 }
 
-.cmp-ch:hover {
-    border-color: rgba(255, 255, 255, 0.12);
+.cs-ch:hover {
+    border-color: rgba(255, 255, 255, 0.14);
     color: rgba(255, 255, 255, 0.7);
 }
 
-.cmp-ch.active {
-    background: color-mix(in srgb, var(--ch) 14%, transparent);
-    border-color: color-mix(in srgb, var(--ch) 30%, transparent);
+.cs-ch.active {
+    background: color-mix(in srgb, var(--ch) 12%, transparent);
+    border-color: color-mix(in srgb, var(--ch) 40%, transparent);
     color: var(--ch);
 }
 
-/* Content types */
-.cmp-types {
-    display: flex;
-    align-items: center;
-    gap: 12px;
+.cs-ch-dot {
+    display: inline-block;
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    background: var(--ch);
+    margin-left: 5px;
+    vertical-align: middle;
 }
 
-.cmp-type-row {
+.cs-types {
     display: flex;
     gap: 4px;
     flex-wrap: wrap;
 }
 
-.cmp-type {
-    font-size: 11.5px;
-    font-weight: 600;
-    padding: 5px 12px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.06);
+.cs-type {
+    padding: 4px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.07);
     background: transparent;
-    color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 11.5px;
+    font-weight: 500;
+    font-family: inherit;
     cursor: pointer;
     transition: all 0.15s ease;
 }
 
-.cmp-type:hover {
-    border-color: rgba(255, 255, 255, 0.12);
-    color: rgba(255, 255, 255, 0.7);
+.cs-type:hover {
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.6);
 }
 
-.cmp-type.active {
-    background: rgba(0, 150, 45, 0.1);
-    border-color: rgba(0, 150, 45, 0.25);
-    color: var(--accent, #00c93a);
+.cs-type.active {
+    background: rgba(255, 255, 255, 0.09);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    font-weight: 600;
 }
 
-/* Textarea */
-.cmp-textarea-wrap {
+/* ══════════════════════════════════════════════════════════
+   WRITE PANEL
+══════════════════════════════════════════════════════════ */
+.cs-write-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+/* Editor wrap */
+.cs-editor-wrap {
+    flex: 1;
     position: relative;
+    min-height: 0;
 }
 
-.cmp-textarea {
+.cs-editor {
     width: 100%;
-    min-height: 180px;
-    padding: 16px;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 10px;
-    color: #eee;
-    font-size: 14px;
-    font-family: inherit;
-    line-height: 1.6;
-    resize: vertical;
+    height: 100%;
+    min-height: 280px;
+    padding: 22px 24px;
+    background: transparent;
+    border: none;
     outline: none;
-    transition: border-color 0.2s ease;
+    resize: none;
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1.7;
+    color: rgba(255, 255, 255, 0.9);
+    caret-color: #00c93a;
+    box-sizing: border-box;
 }
 
-.cmp-textarea::placeholder {
-    color: rgba(255, 255, 255, 0.25);
+.cs-editor::placeholder {
+    color: rgba(255, 255, 255, 0.18);
+    line-height: 1.7;
 }
 
-.cmp-textarea:focus {
-    border-color: rgba(0, 201, 58, 0.4);
-    box-shadow: 0 0 0 3px rgba(0, 150, 45, 0.08);
-}
-
-.cmp-counter {
+.cs-brand-badge {
     position: absolute;
     bottom: 12px;
     right: 14px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 100px;
+    background: rgba(138, 43, 226, 0.12);
+    border: 1px solid rgba(138, 43, 226, 0.2);
+    color: rgba(183, 138, 255, 0.8);
     font-size: 11px;
-    color: rgba(255, 255, 255, 0.25);
+    font-weight: 600;
+    pointer-events: none;
 }
 
-.cmp-counter .over {
-    color: #ff6b6b;
+.cs-brand-badge svg {
+    stroke: currentColor;
+    width: 12px;
+    height: 12px;
 }
 
-.cmp-counter-max {
-    color: rgba(255, 255, 255, 0.15);
-}
-
-/* Toolbar */
-.cmp-toolbar {
+/* ── Toolbar ────────────────────────────────────────────── */
+.cs-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding-top: 4px;
-    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    flex-shrink: 0;
+    gap: 12px;
+    flex-wrap: wrap;
 }
 
-.cmp-tools {
+.cs-tools-left {
     display: flex;
+    align-items: center;
     gap: 4px;
 }
 
-.cmp-tool {
+.cs-tool {
+    width: 34px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.35);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.cs-tool:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.65);
+}
+
+.cs-char-count {
+    margin-left: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.3);
+    font-feature-settings: 'tnum';
+}
+
+.cs-char-count.over {
+    color: #ff6b6b;
+}
+
+.cs-char-max {
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.2);
+}
+
+.cs-tools-right {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 7px 10px;
-    border-radius: 8px;
-    background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.45);
-    cursor: pointer;
-    transition: all 0.15s ease;
-    font-size: 12px;
 }
 
-.cmp-tool:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: rgba(255, 255, 255, 0.8);
-}
-
-.cmp-tool.ai-tool {
-    background: rgba(138, 43, 226, 0.08);
-    border-color: rgba(138, 43, 226, 0.15);
-    color: #b78aff;
-}
-
-.cmp-tool.ai-tool:hover {
-    background: rgba(138, 43, 226, 0.14);
-}
-
-.cmp-submit {
-    display: flex;
-    gap: 8px;
-}
-
-.cmp-btn {
+.cs-action-btn {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -311,687 +428,715 @@
     border-radius: 8px;
     font-size: 13px;
     font-weight: 600;
+    font-family: inherit;
     cursor: pointer;
-    transition: all 0.15s ease;
-    border: none;
-    white-space: nowrap;
+    transition: all 0.18s ease;
 }
 
-.cmp-btn.secondary {
+.cs-action-btn svg {
+    flex-shrink: 0;
+}
+
+.cs-action-btn.secondary {
     background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    color: rgba(255, 255, 255, 0.5);
 }
 
-.cmp-btn.secondary:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: #fff;
+.cs-action-btn.secondary:hover {
+    background: rgba(255, 255, 255, 0.09);
+    color: rgba(255, 255, 255, 0.8);
 }
 
-.cmp-btn.primary {
-    background: var(--accent, #00c93a);
+.cs-action-btn.primary {
+    background: #00c93a;
+    border: none;
     color: #000;
 }
 
-.cmp-btn.primary:hover {
-    filter: brightness(1.15);
-    transform: translateY(-1px);
+.cs-action-btn.primary:hover:not(:disabled) {
+    filter: brightness(1.1);
 }
 
-.cmp-btn.primary:disabled {
+.cs-action-btn.primary:disabled {
     opacity: 0.35;
     cursor: not-allowed;
-    transform: none;
-    filter: none;
 }
 
-/* ── AI Controls Panel ───────────────────── */
-
-.cmp-ai-panel {
-    background: rgba(138, 43, 226, 0.04);
-    border: 1px solid rgba(138, 43, 226, 0.1);
-    border-radius: 12px;
+/* ══════════════════════════════════════════════════════════
+   AI STUDIO PANEL
+══════════════════════════════════════════════════════════ */
+.cs-ai-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
     padding: 20px;
-    animation: panel-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    gap: 20px;
 }
 
-@keyframes panel-in {
-    0% {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    100% {
-        opacity: 1;
-        transform: translateY(0);
-    }
+.cs-ai-panel::-webkit-scrollbar {
+    width: 4px;
 }
 
-.ai-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 16px;
+.cs-ai-panel::-webkit-scrollbar-thumb {
+    background: rgba(138, 43, 226, 0.15);
+    border-radius: 4px;
 }
 
-.ai-title {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 14px;
-    font-weight: 650;
-    color: #b78aff;
-}
-
-.ai-close {
-    width: 26px;
-    height: 26px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: transparent;
-    border: none;
-    color: rgba(255, 255, 255, 0.4);
-    font-size: 18px;
-    cursor: pointer;
-    border-radius: 6px;
-    transition: all 0.15s;
-}
-
-.ai-close:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: #fff;
-}
-
-/* AI Controls */
-.ai-controls {
+.cs-ai-controls {
+    background: rgba(138, 43, 226, 0.05);
+    border: 1px solid rgba(138, 43, 226, 0.1);
+    border-radius: 14px;
+    padding: 18px;
     display: flex;
     flex-direction: column;
     gap: 16px;
 }
 
-.ai-control-group {
+.cs-ai-row {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.cs-ai-group {
     display: flex;
     flex-direction: column;
     gap: 8px;
+    flex: 1;
+    min-width: 200px;
 }
 
-.ai-ctrl-label {
-    font-size: 11.5px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.45);
+.cs-ai-group label {
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(183, 138, 255, 0.6);
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.07em;
 }
 
-.ai-pills {
+.cs-pills {
     display: flex;
+    gap: 5px;
     flex-wrap: wrap;
-    gap: 6px;
 }
 
-.ai-pill {
-    font-size: 12px;
-    font-weight: 500;
+.cs-pill {
     padding: 5px 12px;
     border-radius: 100px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.5);
+    border: 1px solid rgba(138, 43, 226, 0.15);
+    background: rgba(138, 43, 226, 0.06);
+    color: rgba(183, 138, 255, 0.55);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: inherit;
     cursor: pointer;
     transition: all 0.15s ease;
 }
 
-.ai-pill:hover {
-    border-color: rgba(138, 43, 226, 0.2);
-    color: rgba(255, 255, 255, 0.8);
+.cs-pill:hover {
+    background: rgba(138, 43, 226, 0.12);
+    color: rgba(183, 138, 255, 0.8);
 }
 
-.ai-pill.active {
-    background: rgba(138, 43, 226, 0.12);
-    border-color: rgba(138, 43, 226, 0.3);
+.cs-pill.active {
+    background: rgba(138, 43, 226, 0.22);
+    border-color: rgba(138, 43, 226, 0.35);
     color: #c9a0ff;
 }
 
-/* AI Inputs */
-.ai-input-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-}
-
-.ai-input-group {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-
-.ai-input {
-    width: 100%;
-    padding: 9px 12px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
+.cs-ai-input {
+    padding: 9px 13px;
     border-radius: 8px;
-    color: #eee;
+    border: 1px solid rgba(138, 43, 226, 0.14);
+    background: rgba(0, 0, 0, 0.25);
+    color: rgba(255, 255, 255, 0.8);
     font-size: 13px;
     font-family: inherit;
     outline: none;
     transition: border-color 0.2s ease;
 }
 
-.ai-input::placeholder {
-    color: rgba(255, 255, 255, 0.25);
+.cs-ai-input::placeholder {
+    color: rgba(255, 255, 255, 0.2);
 }
 
-.ai-input:focus {
-    border-color: rgba(138, 43, 226, 0.35);
+.cs-ai-input:focus {
+    border-color: rgba(138, 43, 226, 0.3);
 }
 
-/* Brand voice note */
-.ai-brand-note {
+.cs-brand-note {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 10px 14px;
+    gap: 7px;
+    padding: 9px 14px;
+    border-radius: 8px;
     background: rgba(138, 43, 226, 0.08);
     border: 1px solid rgba(138, 43, 226, 0.15);
-    border-radius: 8px;
     font-size: 12px;
-    color: #c9a0ff;
-    animation: panel-in 0.3s ease;
+    color: rgba(183, 138, 255, 0.7);
 }
 
-.ai-brand-note strong {
-    color: #e0c9ff;
+.cs-brand-note svg {
+    stroke: currentColor;
+    flex-shrink: 0;
+}
+
+.cs-brand-note strong {
+    color: #c9a0ff;
 }
 
 /* Generate button */
-.ai-generate-btn {
+.cs-generate-btn {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
     width: 100%;
     padding: 12px;
-    background: linear-gradient(135deg, rgba(138, 43, 226, 0.25), rgba(99, 102, 241, 0.25));
-    border: 1px solid rgba(138, 43, 226, 0.3);
     border-radius: 10px;
-    color: #d4b8ff;
+    border: 1px solid rgba(138, 43, 226, 0.3);
+    background: rgba(138, 43, 226, 0.14);
+    color: #c9a0ff;
     font-size: 14px;
-    font-weight: 650;
+    font-weight: 700;
     font-family: inherit;
     cursor: pointer;
     transition: all 0.2s ease;
 }
 
-.ai-generate-btn:hover:not(:disabled) {
-    background: linear-gradient(135deg, rgba(138, 43, 226, 0.35), rgba(99, 102, 241, 0.35));
-    transform: translateY(-1px);
-    box-shadow: 0 4px 20px rgba(138, 43, 226, 0.15);
+.cs-generate-btn:hover:not(:disabled) {
+    background: rgba(138, 43, 226, 0.22);
+    border-color: rgba(138, 43, 226, 0.45);
 }
 
-.ai-generate-btn:disabled {
-    opacity: 0.6;
+.cs-generate-btn:disabled {
+    opacity: 0.5;
     cursor: not-allowed;
 }
 
-/* AI Spinner */
-.ai-spinner {
+.cs-generate-btn svg {
+    stroke: currentColor;
+}
+
+/* Spinner */
+.cs-spinner {
     width: 16px;
     height: 16px;
-    border: 2px solid rgba(183, 138, 255, 0.3);
-    border-top-color: #b78aff;
+    border: 2px solid rgba(183, 138, 255, 0.2);
+    border-top-color: #c9a0ff;
     border-radius: 50%;
-    animation: spin 0.6s linear infinite;
+    animation: cs-spin 0.8s linear infinite;
+    flex-shrink: 0;
 }
 
-@keyframes spin {
-    to { transform: rotate(360deg); }
+@keyframes cs-spin {
+    to {
+        transform: rotate(360deg);
+    }
 }
 
-/* ── Variations Output ───────────────────── */
-
-.ai-variations {
-    margin-top: 16px;
+/* ── Variations ─────────────────────────────────────────── */
+.cs-variations {
     display: flex;
     flex-direction: column;
-    gap: 10px;
-    animation: panel-in 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    gap: 12px;
 }
 
-.ai-var-header {
+.cs-var-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 4px;
 }
 
-.ai-var-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.6);
+.cs-var-header span {
+    font-size: 12px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.3);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
 }
 
-.ai-regen {
+.cs-regen {
     display: flex;
     align-items: center;
     gap: 5px;
-    padding: 5px 10px;
-    background: transparent;
+    padding: 5px 12px;
+    border-radius: 7px;
     border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 6px;
-    color: rgba(255, 255, 255, 0.45);
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(255, 255, 255, 0.4);
     font-size: 11.5px;
-    font-weight: 500;
+    font-weight: 600;
+    font-family: inherit;
     cursor: pointer;
     transition: all 0.15s ease;
 }
 
-.ai-regen:hover {
-    border-color: rgba(138, 43, 226, 0.25);
-    color: #b78aff;
+.cs-regen:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.7);
 }
 
-/* Variation card */
-.ai-var-card {
+.cs-regen svg {
+    stroke: currentColor;
+}
+
+/* Var grid: 3 cards side by side on wide screens, stacked on narrow */
+.cs-var-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 12px;
+}
+
+.cs-var-card {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 10px;
-    padding: 16px;
-    transition: all 0.2s ease;
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: border-color 0.2s ease, background 0.2s ease;
 }
 
-.ai-var-card:hover {
+.cs-var-card:hover {
     border-color: rgba(255, 255, 255, 0.12);
 }
 
-.ai-var-card.selected {
-    border-color: rgba(0, 150, 45, 0.35);
-    background: rgba(0, 150, 45, 0.04);
+.cs-var-card.selected {
+    border-color: rgba(0, 201, 58, 0.3);
+    background: rgba(0, 201, 58, 0.04);
 }
 
-.ai-var-top {
+.cs-var-top {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 10px;
 }
 
-.ai-var-label {
-    font-size: 12px;
+.cs-var-label {
+    font-size: 11.5px;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.55);
+    color: rgba(255, 255, 255, 0.4);
     text-transform: capitalize;
 }
 
-.ai-var-score {
+.cs-var-score {
     font-size: 11px;
-    font-weight: 600;
-    padding: 3px 8px;
+    font-weight: 700;
+    padding: 2px 9px;
     border-radius: 100px;
-    background: rgba(0, 150, 45, 0.1);
-    color: var(--accent, #00c93a);
+    background: rgba(0, 201, 58, 0.1);
+    border: 1px solid rgba(0, 201, 58, 0.2);
+    color: #00c93a;
 }
 
-.ai-var-text {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.7);
+.cs-var-text {
+    margin: 0;
+    font-size: 12.5px;
+    color: rgba(255, 255, 255, 0.55);
     line-height: 1.6;
-    margin: 0 0 12px;
-    white-space: pre-wrap;
-    word-break: break-word;
+    flex: 1;
+    display: -webkit-box;
+    -webkit-line-clamp: 6;
+    line-clamp: 6;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
 }
 
-/* Variation editing */
-.ai-var-edit {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-bottom: 10px;
-}
-
-.ai-var-textarea {
+.cs-var-edit textarea {
     width: 100%;
-    padding: 12px;
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(138, 43, 226, 0.2);
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
-    color: #eee;
-    font-size: 13px;
+    padding: 10px;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 12.5px;
     font-family: inherit;
-    line-height: 1.6;
-    resize: vertical;
     outline: none;
+    resize: vertical;
+    box-sizing: border-box;
 }
 
-.ai-var-textarea:focus {
-    border-color: rgba(138, 43, 226, 0.4);
-}
-
-.ai-var-edit-actions {
+.cs-var-edit-actions {
     display: flex;
     gap: 6px;
+    margin-top: 6px;
 }
 
-/* Variation actions */
-.ai-var-actions {
+.cs-var-actions {
     display: flex;
-    gap: 6px;
+    gap: 5px;
     flex-wrap: wrap;
 }
 
-.ai-var-action {
+.cs-var-act {
     display: flex;
     align-items: center;
     gap: 4px;
     padding: 5px 10px;
-    background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.07);
     border-radius: 6px;
-    color: rgba(255, 255, 255, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: rgba(255, 255, 255, 0.03);
+    color: rgba(255, 255, 255, 0.42);
     font-size: 11.5px;
+    font-weight: 600;
+    font-family: inherit;
     cursor: pointer;
     transition: all 0.15s ease;
-    font-family: inherit;
 }
 
-.ai-var-action:hover {
-    border-color: rgba(255, 255, 255, 0.15);
-    color: rgba(255, 255, 255, 0.8);
+.cs-var-act:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.7);
 }
 
-.ai-var-action.use {
-    background: rgba(0, 150, 45, 0.08);
-    border-color: rgba(0, 150, 45, 0.2);
-    color: var(--accent, #00c93a);
+.cs-var-act.use {
+    background: rgba(0, 201, 58, 0.08);
+    border-color: rgba(0, 201, 58, 0.2);
+    color: #00c93a;
 }
 
-.ai-var-action.use:hover {
-    background: rgba(0, 150, 45, 0.14);
+.cs-var-act.use:hover {
+    background: rgba(0, 201, 58, 0.14);
 }
 
-/* ── Preview column ───────────────────────── */
+.cs-var-act svg {
+    stroke: currentColor;
+}
 
-.cmp-preview {
+/* ══════════════════════════════════════════════════════════
+   PREVIEW PANEL (right column, slides in)
+══════════════════════════════════════════════════════════ */
+.cs-preview-panel {
+    width: 320px;
+    flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    position: sticky;
-    top: 16px;
+    border-left: 1px solid rgba(255, 255, 255, 0.06);
+    background: rgba(8, 8, 18, 0.5);
+    min-height: 0;
 }
 
-.prev-title {
-    font-size: 13px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.5);
+.cs-prev-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    flex-shrink: 0;
+}
+
+.cs-prev-header h3 {
     margin: 0;
+    font-size: 13.5px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.6);
+    letter-spacing: -0.01em;
 }
 
-/* Preview card */
-.prev-card {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 14px;
-    padding: 18px;
+.cs-prev-close {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 7px;
+    border: none;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.4);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.cs-prev-close:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+}
+
+.cs-prev-close svg {
+    stroke: currentColor;
+}
+
+.cs-prev-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 14px;
     display: flex;
     flex-direction: column;
     gap: 12px;
-    transition: all 0.2s ease;
 }
 
-.prev-card:hover {
-    border-color: color-mix(in srgb, var(--ch, #888) 20%, transparent);
+.cs-prev-scroll::-webkit-scrollbar {
+    width: 3px;
 }
 
-.prev-header {
+.cs-prev-scroll::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.07);
+    border-radius: 4px;
+}
+
+/* Preview card */
+.cs-prev-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid color-mix(in srgb, var(--ch) 20%, transparent);
+    border-radius: 12px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.cs-prev-card-header {
     display: flex;
     align-items: center;
     gap: 10px;
 }
 
-.prev-avatar {
-    width: 36px;
-    height: 36px;
+.cs-prev-avatar {
+    width: 34px;
+    height: 34px;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 14px;
-    font-weight: 700;
+    font-size: 13px;
+    font-weight: 800;
     color: #fff;
     flex-shrink: 0;
 }
 
-.prev-name {
-    font-size: 13px;
-    font-weight: 650;
-    color: #eee;
-    display: block;
-    line-height: 1.2;
-}
-
-.prev-handle {
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.35);
-    display: block;
-}
-
-.prev-badge {
-    margin-left: auto;
-    font-size: 10px;
-    font-weight: 700;
-    padding: 3px 8px;
-    border-radius: 100px;
-    color: #fff;
-}
-
-.prev-content {
-    font-size: 13.5px;
-    color: rgba(255, 255, 255, 0.7);
-    line-height: 1.6;
-    margin: 0;
-    white-space: pre-wrap;
-    word-break: break-word;
-    max-height: 200px;
-    overflow-y: auto;
-}
-
-.prev-meta {
-    display: flex;
-    gap: 6px;
-    font-size: 11.5px;
-    color: rgba(255, 255, 255, 0.3);
-}
-
-.prev-engagement {
-    display: flex;
-    gap: 16px;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.35);
-    padding-top: 8px;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-/* ── Content Score Card ───────────────────── */
-
-.prev-score-card {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 14px;
-    padding: 18px;
+.cs-prev-info {
+    flex: 1;
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 14px;
-    animation: panel-in 0.3s ease;
+    gap: 1px;
 }
 
-.prev-score-card h4 {
-    font-size: 12px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.45);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+.cs-prev-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.cs-prev-handle {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.28);
+}
+
+.cs-prev-badge {
+    padding: 2px 8px;
+    border-radius: 100px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #fff;
+    opacity: 0.85;
+    flex-shrink: 0;
+}
+
+.cs-prev-content {
     margin: 0;
-    align-self: flex-start;
+    font-size: 12.5px;
+    color: rgba(255, 255, 255, 0.6);
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-word;
 }
 
-.prev-score-ring {
+.cs-prev-meta {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.2);
+}
+
+.cs-prev-reactions {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.28);
+}
+
+/* ── Score card ─────────────────────────────────────────── */
+.cs-score-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: rgba(0, 201, 58, 0.04);
+    border: 1px solid rgba(0, 201, 58, 0.1);
+    border-radius: 12px;
+    padding: 14px;
+}
+
+.cs-score-ring-wrap {
     position: relative;
-    width: 80px;
-    height: 80px;
+    width: 60px;
+    height: 60px;
+    flex-shrink: 0;
 }
 
-.score-svg {
-    width: 80px;
-    height: 80px;
+.cs-score-svg {
+    width: 60px;
+    height: 60px;
     transform: rotate(-90deg);
 }
 
-.score-number {
+.cs-score-center {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--accent, #00c93a);
-}
-
-.prev-score-details {
-    width: 100%;
+    inset: 0;
     display: flex;
     flex-direction: column;
-    gap: 7px;
+    align-items: center;
+    justify-content: center;
 }
 
-.score-item {
+.cs-score-num {
+    font-size: 16px;
+    font-weight: 800;
+    color: #00c93a;
+    line-height: 1;
+}
+
+.cs-score-label {
+    font-size: 9px;
+    font-weight: 600;
+    color: rgba(0, 201, 58, 0.55);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.cs-score-items {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    flex: 1;
+}
+
+.cs-score-item {
     display: flex;
     align-items: center;
-    gap: 8px;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.5);
+    gap: 7px;
+    font-size: 11.5px;
+    color: rgba(255, 255, 255, 0.45);
 }
 
-.score-dot {
-    width: 6px;
-    height: 6px;
+.cs-score-dot {
+    width: 7px;
+    height: 7px;
     border-radius: 50%;
     flex-shrink: 0;
 }
 
-/* Tips */
-.prev-tips {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 14px;
-    padding: 18px;
+/* ── Tips card ──────────────────────────────────────────── */
+.cs-tips {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+    padding: 14px;
 }
 
-.prev-tips h4 {
-    font-size: 12px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.45);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+.cs-tips h4 {
     margin: 0 0 10px;
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.25);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
 }
 
-.prev-tips ul {
-    list-style: none;
-    padding: 0;
+.cs-tips ul {
     margin: 0;
+    padding: 0;
+    list-style: none;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 6px;
 }
 
-.prev-tips li {
-    font-size: 12.5px;
-    color: rgba(255, 255, 255, 0.4);
+.cs-tips li {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.42);
+    line-height: 1.4;
     padding-left: 14px;
     position: relative;
-    line-height: 1.4;
 }
 
-.prev-tips li::before {
+.cs-tips li::before {
     content: '→';
     position: absolute;
     left: 0;
-    color: rgba(255, 255, 255, 0.2);
-    font-size: 11px;
+    color: rgba(0, 201, 58, 0.5);
+    font-size: 10px;
 }
 
-/* ── Toast ────────────────────────────────── */
-
-.cmp-toast {
+/* ══════════════════════════════════════════════════════════
+   TOAST
+══════════════════════════════════════════════════════════ */
+.cs-toast {
     position: fixed;
-    bottom: 32px;
+    bottom: 28px;
     left: 50%;
     transform: translateX(-50%);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 12px 24px;
-    background: var(--accent, #00c93a);
-    color: #000;
+    padding: 12px 22px;
+    border-radius: 12px;
+    background: rgba(15, 15, 25, 0.92);
+    border: 1px solid rgba(0, 201, 58, 0.3);
+    color: #00c93a;
     font-size: 13.5px;
     font-weight: 600;
-    border-radius: 10px;
-    box-shadow: 0 8px 32px rgba(0, 150, 45, 0.3);
-    animation: toast-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    z-index: 1000;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+    z-index: 999;
+    animation: cs-toast-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    white-space: nowrap;
 }
 
-@keyframes toast-in {
-    0% {
+@keyframes cs-toast-in {
+    from {
         opacity: 0;
-        transform: translateX(-50%) translateY(20px);
+        transform: translateX(-50%) translateY(12px);
     }
-    100% {
+
+    to {
         opacity: 1;
         transform: translateX(-50%) translateY(0);
     }
 }
 
-/* ── Responsive ───────────────────────────── */
-
+/* ══════════════════════════════════════════════════════════
+   RESPONSIVE
+══════════════════════════════════════════════════════════ */
 @media (max-width: 900px) {
-    .cmp-layout {
-        grid-template-columns: 1fr;
+    .cs-preview-panel {
+        position: fixed;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        z-index: 100;
+        width: 300px;
+        box-shadow: -12px 0 40px rgba(0, 0, 0, 0.4);
     }
 
-    .cmp-toolbar {
-        flex-wrap: wrap;
-    }
-
-    .cmp-submit {
-        width: 100%;
-        justify-content: flex-end;
-    }
-
-    .ai-input-row {
-        grid-template-columns: 1fr;
-    }
-
-    .cmp-head {
-        flex-direction: column;
-    }
-
-    .cmp-preview {
-        position: static;
+    .cs-channel-bar {
+        gap: 8px;
     }
 }
 
 @media (max-width: 600px) {
-    .cmp-tools {
-        flex-wrap: wrap;
-    }
-
-    .cmp-submit {
+    .cs-topbar {
         flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
     }
 
-    .cmp-btn {
-        justify-content: center;
+    .cs-var-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .cs-tools-right {
+        flex-wrap: wrap;
     }
 }

@@ -1,443 +1,660 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import MainLayout from '../../components/Layout/MainLayout';
 import './Inbox.css';
 import { io } from 'socket.io-client';
 
+/* ── Cache ─────────────────────────────────────────────────────────────────── */
+const CACHE_KEY = 'flowsync_inbox_threads';
+const CACHE_TTL = 5 * 60 * 1000;
+
+function saveCache(threads) {
+    try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ threads, ts: Date.now() })); } catch (_) { }
+}
+function loadCache() {
+    try {
+        const raw = sessionStorage.getItem(CACHE_KEY);
+        if (!raw) return null;
+        const { threads, ts } = JSON.parse(raw);
+        if (Date.now() - ts > CACHE_TTL) { sessionStorage.removeItem(CACHE_KEY); return null; }
+        return threads;
+    } catch (_) { return null; }
+}
+
+/* ── Platform metadata ─────────────────────────────────────────────────────── */
 const platformMeta = {
-    instagram: { abbr: 'IG', color: '#E4405F', name: 'Instagram' },
-    twitter: { abbr: 'X', color: '#1DA1F2', name: 'X (Twitter)' },
-    whatsapp: { abbr: 'WA', color: '#25D366', name: 'WhatsApp' },
-    telegram: { abbr: 'TG', color: '#0088CC', name: 'Telegram' },
+    instagram: {
+        abbr: 'IG', color: '#E4405F', name: 'Instagram',
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" /></svg>
+    },
+    twitter: {
+        abbr: 'X', color: '#1DA1F2', name: 'X (Twitter)',
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M23 3a10.9 10.9 0 0 1-3.14 1.53 4.48 4.48 0 0 0-7.86 3v1A10.66 10.66 0 0 1 3 4s-4 9 5 13a11.64 11.64 0 0 1-7 2c9 5 20 0 20-11.5a4.5 4.5 0 0 0-.08-.83A7.72 7.72 0 0 0 23 3z" /></svg>
+    },
+    whatsapp: {
+        abbr: 'WA', color: '#25D366', name: 'WhatsApp',
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" /></svg>
+    },
+    telegram: {
+        abbr: 'TG', color: '#0088CC', name: 'Telegram',
+        icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>
+    },
 };
 
-/* Mock AI reply suggestions */
-const mockAISuggestions = {
-    sales: [
-        "Hi! Thanks for reaching out. Our pricing starts at $29/month for the Starter plan with all core features included. Would you like me to walk you through the options?",
-        "Great to hear from you! We have flexible plans designed for businesses of all sizes. I'd love to schedule a quick demo — when works best for you?",
-        "Thanks for your interest! Here's a quick overview of what's included. Feel free to book a call if you'd like to learn more: flowsync.io/demo"
-    ],
-    support: [
-        "Thanks for reaching out! Let me look into this for you right away. Could you share a screenshot or more details about the issue?",
-        "I understand the frustration. Let me check our system and get back to you with a solution within the next 30 minutes.",
-        "Happy to help! This is a known issue we're working on. In the meantime, here's a quick workaround..."
-    ],
-    general: [
-        "Thanks for the kind words! We really appreciate your support. Stay tuned for some exciting updates coming soon! 🚀",
-        "Great question! Let me get you the best answer. I'll follow up shortly with more details.",
-        "Appreciate you reaching out! We love hearing from our community. Is there anything specific I can help with?"
-    ]
-};
+/* ── Context-based AI suggestion engine ────────────────────────────────────── */
+function detectIntent(messages) {
+    const text = messages.map(m => m.text).join(' ').toLowerCase();
+    if (/price|cost|plan|how much|pricing|buy|purchase|subscribe/.test(text)) return 'sales';
+    if (/help|issue|problem|broken|error|fix|support|not working|bug/.test(text)) return 'support';
+    if (/thank|great|awesome|love|nice|good job|amazing/.test(text)) return 'praise';
+    if (/hello|hi|hey|good morning|good evening|start/.test(text)) return 'greeting';
+    return 'general';
+}
 
+function generateAISuggestions(messages, name) {
+    const intent = detectIntent(messages);
+    const lastName = (messages.slice().reverse().find(m => m.incoming))?.text?.slice(0, 80) || '';
+    const subject = name || 'there';
+
+    const sets = {
+        sales: [
+            `Hi ${subject}! Our plans start at $29/month. Would you like me to walk you through the options?`,
+            `Thanks for your interest! I can set up a quick demo for you this week — what time works best?`,
+            `Great question! You can see full feature & pricing details at flowsync.io/pricing. Happy to answer any questions!`
+        ],
+        support: [
+            `Hi ${subject}, I'm sorry to hear that. Could you share your order/account number so I can look into this?`,
+            `Thanks for letting us know! I've escalated this to our tech team and will follow up within the hour.`,
+            `I understand your frustration. Let me check on this right now — can you describe the issue in a bit more detail?`
+        ],
+        praise: [
+            `Thank you so much, ${subject}! That really means a lot to us 🙏`,
+            `We're thrilled to hear that! Your feedback keeps us going. Don't hesitate to reach out anytime!`,
+            `Wonderful to hear! We'd love it if you shared your experience — it helps others too 🌟`
+        ],
+        greeting: [
+            `Hello ${subject}! 👋 Welcome! How can I help you today?`,
+            `Hi there! Great to connect with you. What can I do for you?`,
+            `Hey ${subject}! Thanks for reaching out. How can I assist you?`
+        ],
+        general: [
+            `Thanks for reaching out, ${subject}! How can I help you today?`,
+            `Absolutely! Let me get that information for you right away.`,
+            `Thanks for contacting us. Is there anything else I can assist you with?`
+        ]
+    };
+
+    const intentLabel = intent.charAt(0).toUpperCase() + intent.slice(1);
+    const suggestions = sets[intent] || sets.general;
+    const lastIncoming = messages.slice().reverse().find(m => m.incoming);
+    const summary = lastIncoming
+        ? `Last message: "${lastIncoming.text.slice(0, 90)}${lastIncoming.text.length > 90 ? '…' : ''}"`
+        : `No incoming messages yet.`;
+
+    return { intent: intentLabel, suggestions, summary };
+}
+
+/* ── Component ──────────────────────────────────────────────────────────────── */
 const Inbox = () => {
     const [loaded, setLoaded] = useState(false);
+    const [activePlatform, setActivePlatform] = useState('all');
     const [filter, setFilter] = useState('all');
     const [selected, setSelected] = useState(null);
     const [replyText, setReplyText] = useState('');
+    const [sendingReply, setSendingReply] = useState(false);
+    const [sendError, setSendError] = useState('');
     const [showAI, setShowAI] = useState(true);
     const [aiLoading, setAiLoading] = useState(false);
     const [aiSuggestions, setAiSuggestions] = useState([]);
     const [aiSummary, setAiSummary] = useState('');
     const [aiIntent, setAiIntent] = useState('');
     const [autoReply, setAutoReply] = useState({ instagram: false, twitter: false, whatsapp: true, telegram: false });
+    const [searchQuery, setSearchQuery] = useState('');
 
-    const [threads, setThreads] = useState([
-        // Mock data for other platforms will form the initial state
-        // We will filter out 'whatsapp' mock data once real data arrives
-        {
-            id: 2, platform: 'twitter', from: '@tech_sarah', name: 'Tech Sarah', avatar: 'TS',
-            intent: 'general', vip: false, tags: [],
-            messages: [
-                { text: '@FlowSync just made my workflow 10x easier 🚀 Can\'t believe I was doing this manually!', time: '15m ago', incoming: true },
-            ], unread: true, flagged: false
-        },
-        {
-            id: 3, platform: 'instagram', from: '@creator_pro', name: 'Creative Studio', avatar: 'CS',
-            intent: 'support', vip: false, tags: ['bug-report'],
-            messages: [
-                { text: 'Hey, I\'m having trouble connecting my second Instagram account. Getting an error on the OAuth screen.', time: '1h ago', incoming: true },
-                { text: 'Can you try disconnecting and reconnecting? Go to Settings → Accounts → Instagram → Disconnect', time: '45m ago', incoming: false },
-                { text: 'Still getting the same error. Here\'s a screenshot...', time: '30m ago', incoming: true },
-            ], unread: true, flagged: false
-        },
-        {
-            id: 4, platform: 'telegram', from: 'Alex Rivera', name: 'Alex Rivera', avatar: 'AR',
-            intent: 'sales', vip: true, tags: ['enterprise'],
-            messages: [
-                { text: 'Interested in your Enterprise plan for our 50-person team. Can we schedule a demo?', time: '2h ago', incoming: true },
-            ], unread: true, flagged: true
-        },
-        {
-            id: 5, platform: 'twitter', from: '@devtools_daily', name: 'DevTools Daily', avatar: 'DD',
-            intent: 'general', vip: false, tags: ['media'],
-            messages: [
-                { text: 'Would love to feature FlowSync in our weekly newsletter. Do you have a press kit?', time: '3h ago', incoming: true },
-                { text: 'Absolutely! I\'ll send the press kit over. Thanks for the interest!', time: '2h ago', incoming: false },
-                { text: 'Perfect, looking forward to it! When can we expect it?', time: '1h ago', incoming: true },
-            ], unread: false, flagged: false
-        },
-        {
-            id: 6, platform: 'instagram', from: '@jane_markets', name: 'Jane Marketing', avatar: 'JM',
-            intent: 'support', vip: false, tags: [],
-            messages: [
-                { text: 'Your auto-reply feature sent the wrong response to one of our customers 😬', time: '4h ago', incoming: true },
-            ], unread: false, flagged: true
-        },
-    ]);
+    /* ── WA connection tracking ─────────────────────────────────────────────── */
+    const [waReady, setWaReady] = useState(null); // null = unknown, true/false
+    const messagesBottomRef = useRef(null);
+
+    /* ── Fetch state machine ────────────────────────────────────────────────── */
+    // 'idle' | 'loading' | 'done' | 'error' | 'not_connected'
+    const [fetchState, setFetchState] = useState('idle');
+    const [fetchProgress, setFetchProgress] = useState({ current: 0, total: 0, message: 'Connecting...' });
+
+    /* ── Thread data ────────────────────────────────────────────────────────── */
+    const [threads, setThreads] = useState(() => loadCache() || []);
+    const socketRef = useRef(null);
+    const fetchTimeoutRef = useRef(null);
+    const didFetchRef = useRef(false);
+
+    /* Auto-scroll to newest message */
+    useEffect(() => {
+        messagesBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [selected, threads]);
+
+    const startFetchTimeout = useCallback(() => {
+        clearTimeout(fetchTimeoutRef.current);
+        fetchTimeoutRef.current = setTimeout(() => {
+            setThreads(prev => {
+                if (prev.filter(t => t.platform === 'whatsapp').length === 0) {
+                    setFetchState('error');
+                }
+                return prev;
+            });
+        }, 25000);
+    }, []);
 
     useEffect(() => {
         requestAnimationFrame(() => setLoaded(true));
 
-        // Connect to socket
-        const socket = io('http://localhost:5000');
+        const cached = loadCache();
+        if (cached && cached.length > 0) {
+            setThreads(cached);
+            setFetchState('done');
+            didFetchRef.current = true;
+        }
 
+        const socket = io('http://localhost:5000');
+        socketRef.current = socket;
+
+        /* ── On connect: ask WA status + fetch Telegram ── */
         socket.on('connect', () => {
-            console.log('Inbox connected to socket');
-            socket.emit('start_whatsapp'); // Ensure client is active
-            socket.emit('get_whatsapp_chats'); // Fetch chats
+            console.log('[Inbox] Socket connected');
+            socket.emit('start_whatsapp');
+            // Always fetch Telegram messages (no auth needed)
+            socket.emit('get_telegram_messages');
+        });
+
+        /* ── WA status: the key gatekeeper ── */
+        socket.on('whatsapp_status', (status) => {
+            console.log('[Inbox] WA status:', status);
+            const ready = status.ready;
+            setWaReady(ready);
+
+            if (!ready) {
+                // WA not connected — don't even try to fetch chats
+                if (threads.filter(t => t.platform === 'whatsapp').length === 0) {
+                    setFetchState('not_connected');
+                }
+                return;
+            }
+
+            // WA is ready — fetch chats if we don't have fresh cache
+            if (!didFetchRef.current) {
+                setFetchState('loading');
+                socket.emit('get_whatsapp_chats');
+                startFetchTimeout();
+            }
+        });
+
+        socket.on('whatsapp_loading_progress', (data) => {
+            setFetchState('loading');
+            setFetchProgress(data);
         });
 
         socket.on('whatsapp_chats', (chats) => {
-            console.log('Received WhatsApp chats:', chats);
+            clearTimeout(fetchTimeoutRef.current);
+            console.log('[Inbox] Received WA chats:', chats.length);
             setThreads(prev => {
-                // Keep non-whatsapp threads, replace/append real whatsapp ones
                 const others = prev.filter(t => t.platform !== 'whatsapp');
-                return [...chats, ...others].sort((a, b) => {
-                    // Simple sort by unread or ID for now (real app needs timestamp parsing)
-                    return (b.unread ? 1 : 0) - (a.unread ? 1 : 0);
-                });
+                const merged = [...chats, ...others].sort((a, b) => (b.unread ? 1 : 0) - (a.unread ? 1 : 0));
+                saveCache(merged);
+                return merged;
+            });
+            setFetchState('done');
+            didFetchRef.current = true;
+        });
+
+        /* ── Telegram threads ── */
+        socket.on('telegram_threads', (tgThreads) => {
+            console.log('[Inbox] Received TG threads:', tgThreads.length);
+            setThreads(prev => {
+                const others = prev.filter(t => t.platform !== 'telegram');
+                const merged = [...others, ...tgThreads].sort((a, b) => (b.unread ? 1 : 0) - (a.unread ? 1 : 0));
+                saveCache(merged);
+                return merged;
+            });
+            if (fetchState === 'idle' || fetchState === 'not_connected') {
+                setFetchState('done');
+            }
+        });
+
+        /* ── Real-time incoming WA message ── */
+        socket.on('whatsapp_message', (msg) => {
+            setThreads(prev => {
+                const idx = prev.findIndex(t => t.id === msg.chatId);
+                if (idx > -1) {
+                    const next = [...prev];
+                    next[idx] = {
+                        ...next[idx],
+                        messages: [...next[idx].messages, { text: msg.text, time: msg.time, incoming: msg.incoming }],
+                        unread: msg.incoming ? true : next[idx].unread
+                    };
+                    saveCache(next);
+                    return next;
+                }
+                return prev;
             });
         });
 
-        socket.on('whatsapp_message', (msg) => {
-            console.log('New WhatsApp message:', msg);
-            setThreads(prev => {
-                const threadIndex = prev.findIndex(t => t.id === msg.chatId);
-                if (threadIndex > -1) {
-                    // Update existing thread
-                    const newThreads = [...prev];
-                    const thread = newThreads[threadIndex];
-                    newThreads[threadIndex] = {
-                        ...thread,
-                        messages: [...thread.messages, {
-                            text: msg.text,
-                            time: msg.time,
-                            incoming: msg.incoming
-                        }],
-                        unread: msg.incoming ? true : thread.unread
-                    };
-                    // Move to top?
-                    return newThreads;
-                } else {
-                    // Create new thread (handled by get_chats usually, but real-time new chat?)
-                    // For now, simpler to just re-fetch or append
-                    return prev;
-                }
-            });
+        /* ── Message send confirmations ── */
+        socket.on('send_message_ok', ({ chatId }) => {
+            setSendingReply(false);
+            setSendError('');
+        });
+
+        socket.on('send_message_error', ({ chatId, error }) => {
+            setSendingReply(false);
+            setSendError(error || 'Failed to send message');
+            setTimeout(() => setSendError(''), 4000);
         });
 
         socket.on('whatsapp_ready', () => {
-            console.log('WhatsApp Ready - Fetching chats');
-            socket.emit('get_whatsapp_chats');
+            console.log('[Inbox] WhatsApp ready');
+            setWaReady(true);
+            if (!didFetchRef.current) {
+                setFetchState('loading');
+                socket.emit('get_whatsapp_chats');
+                startFetchTimeout();
+            }
         });
 
-        socket.on('whatsapp_authenticated', () => {
-            console.log('WhatsApp Authenticated - Fetching chats');
-            socket.emit('get_whatsapp_chats');
+        socket.on('whatsapp_chats_error', (err) => {
+            console.warn('[Inbox] Chat fetch error:', err);
+            clearTimeout(fetchTimeoutRef.current);
+            if (err.reason === 'not_ready') {
+                setWaReady(false);
+                if (threads.filter(t => t.platform === 'whatsapp').length === 0) {
+                    setFetchState('not_connected');
+                }
+            } else if (err.reason === 'session_stale') {
+                setFetchProgress({ current: 0, total: 0, message: 'Session stale, reconnecting...' });
+            } else if (threads.length === 0) {
+                setFetchState('error');
+            }
         });
 
-        return () => socket.disconnect();
+        socket.on('whatsapp_disconnected', () => {
+            setWaReady(false);
+        });
+
+        socket.on('connect_error', () => {
+            clearTimeout(fetchTimeoutRef.current);
+            setThreads(prev => {
+                if (prev.length === 0) setFetchState('error');
+                return prev;
+            });
+        });
+
+        return () => {
+            clearTimeout(fetchTimeoutRef.current);
+            socket.disconnect();
+            socketRef.current = null;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-
-
-    const filters = [
-        { key: 'all', label: 'All' },
-        { key: 'unread', label: 'Unread' },
-        { key: 'flagged', label: 'Flagged' },
-        { key: 'vip', label: 'VIP' },
-        { key: 'sales', label: 'Sales' },
-    ];
-
+    /* ── Filter / search ────────────────────────────────────────────────────── */
     const filtered = useMemo(() => threads.filter(t => {
-        if (filter === 'unread') return t.unread;
-        if (filter === 'flagged') return t.flagged;
-        if (filter === 'vip') return t.vip;
-        if (filter === 'sales') return t.intent === 'sales';
-        return true;
-    }), [threads, filter]);
+        const matchesPlatform = activePlatform === 'all' || t.platform === activePlatform;
+        const matchesFilter =
+            filter === 'all' ? true :
+                filter === 'unread' ? t.unread :
+                    filter === 'flagged' ? t.flagged : true;
+        const matchesSearch = !searchQuery.trim() ||
+            t.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            t.messages?.some(m => m.text?.toLowerCase().includes(searchQuery.toLowerCase()));
+        return matchesPlatform && matchesFilter && matchesSearch;
+    }), [threads, activePlatform, filter, searchQuery]);
 
-    const unreadCount = threads.filter(t => t.unread).length;
     const activeThread = selected !== null ? threads.find(t => t.id === selected) : null;
 
-    /* Generate AI suggestions when selecting a thread */
+    /* ── Retry fetch ────────────────────────────────────────────────────────── */
+    const retryFetch = useCallback(() => {
+        sessionStorage.removeItem(CACHE_KEY);
+        didFetchRef.current = false;
+        setSendError('');
+        if (socketRef.current?.connected) {
+            socketRef.current.emit('start_whatsapp');
+            socketRef.current.emit('get_telegram_messages');
+        }
+        setFetchState('loading');
+        setFetchProgress({ current: 0, total: 0, message: 'Retrying...' });
+    }, []);
+
+    /* ── Select thread → generate context-aware AI ─────────────────────────── */
     const selectThread = useCallback((id) => {
         setSelected(id);
+        setSendError('');
         const thread = threads.find(t => t.id === id);
         if (thread) {
             setAiLoading(true);
             setAiSuggestions([]);
             setAiSummary('');
             setAiIntent('');
+            setThreads(prev => {
+                const next = prev.map(t => t.id === id ? { ...t, unread: false } : t);
+                saveCache(next);
+                return next;
+            });
             setTimeout(() => {
-                const sugType = thread.intent || 'general';
-                setAiSuggestions(mockAISuggestions[sugType] || mockAISuggestions.general);
-                setAiIntent(sugType.charAt(0).toUpperCase() + sugType.slice(1));
-                const lastMsg = thread.messages[thread.messages.length - 1];
-                setAiSummary(
-                    thread.messages.length > 2
-                        ? `${thread.messages.length}-message thread. Customer is ${thread.intent === 'sales' ? 'inquiring about pricing/plans' : thread.intent === 'support' ? 'reporting an issue' : 'engaging positively'}. Last message: "${lastMsg.text.substring(0, 60)}…"`
-                        : `${thread.name} sent a ${sugType} message via ${platformMeta[thread.platform]?.name || thread.platform}. ${thread.vip ? 'VIP contact.' : ''}`
-                );
+                const { intent, suggestions, summary } = generateAISuggestions(thread.messages, thread.name);
+                setAiIntent(intent);
+                setAiSuggestions(suggestions);
+                setAiSummary(summary);
                 setAiLoading(false);
-                // Mark as read
-                setThreads(prev => prev.map(t => t.id === id ? { ...t, unread: false } : t));
-            }, 800);
+            }, 500);
         }
     }, [threads]);
 
-    const applySuggestion = useCallback((text) => {
-        setReplyText(text);
-    }, []);
-
+    /* ── Send reply (real socket) ────────────────────────────────────────────── */
     const sendReply = useCallback(() => {
-        if (!replyText.trim() || !selected) return;
-        setThreads(prev => prev.map(t =>
-            t.id === selected
-                ? { ...t, messages: [...t.messages, { text: replyText, time: 'Just now', incoming: false }] }
-                : t
-        ));
+        if (!replyText.trim() || !selected || sendingReply) return;
+        const thread = threads.find(t => t.id === selected);
+        if (!thread) return;
+
+        const msgObj = { text: replyText, time: 'Just now', incoming: false };
+
+        // Optimistically add to UI
+        setThreads(prev => {
+            const next = prev.map(t =>
+                t.id === selected ? { ...t, messages: [...t.messages, msgObj] } : t
+            );
+            saveCache(next);
+            return next;
+        });
+
+        const text = replyText;
         setReplyText('');
-    }, [replyText, selected]);
+        setSendingReply(true);
+        setSendError('');
+
+        const socket = socketRef.current;
+        if (!socket?.connected) {
+            setSendingReply(false);
+            setSendError('Not connected to server');
+            return;
+        }
+
+        if (thread.platform === 'whatsapp') {
+            socket.emit('send_whatsapp_message', { chatId: thread.id, text });
+        } else if (thread.platform === 'telegram') {
+            socket.emit('send_telegram_message', { telegramChatId: thread.telegramChatId, text });
+        } else {
+            // Other platforms: just local update
+            setSendingReply(false);
+        }
+    }, [replyText, selected, sendingReply, threads]);
 
     const toggleAutoReply = useCallback((ch) => {
         setAutoReply(prev => ({ ...prev, [ch]: !prev[ch] }));
     }, []);
 
+    const pct = fetchProgress.total > 0 ? Math.round((fetchProgress.current / fetchProgress.total) * 100) : 5;
+
     return (
         <MainLayout>
-            <div className={`inbox ${loaded ? 'loaded' : ''}`}>
-                {/* ── Header ── */}
-                <div className="ib-head anim-ib" style={{ '--i': 0 }}>
-                    <div>
-                        <h1>Inbox AI</h1>
-                        <p>Unified messaging with AI-powered assistance</p>
-                    </div>
-                    <div className="ib-head-right">
-                        <div className="ib-unread-badge">{unreadCount} unread</div>
-                        <button
-                            className={`ib-ai-toggle ${showAI ? 'active' : ''}`}
-                            onClick={() => setShowAI(!showAI)}
-                        >
-                            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M10 2l1 4 4 1-4 1-1 4-1-4-4-1 4-1 1-4z" /><path d="M15 12l.5 2 2 .5-2 .5-.5 2-.5-2-2-.5 2-.5.5-2z" /></svg>
-                            AI Panel
-                        </button>
-                    </div>
-                </div>
+            <div className={`ib-container ${loaded ? 'loaded' : ''}`}>
 
-                {/* ── Filters ── */}
-                <div className="ib-filters anim-ib" style={{ '--i': 1 }}>
-                    {filters.map(f => (
-                        <button
-                            key={f.key}
-                            className={`ib-filter ${filter === f.key ? 'active' : ''}`}
-                            onClick={() => setFilter(f.key)}
-                        >
-                            {f.label}
-                            <span className="ib-filter-count">
-                                {f.key === 'all' ? threads.length : threads.filter(t =>
-                                    f.key === 'unread' ? t.unread :
-                                        f.key === 'flagged' ? t.flagged :
-                                            f.key === 'vip' ? t.vip :
-                                                f.key === 'sales' ? t.intent === 'sales' : true
-                                ).length}
-                            </span>
-                        </button>
-                    ))}
-                </div>
-
-                {/* ── Three-column split ── */}
-                <div className={`ib-split anim-ib ${showAI ? 'with-ai' : ''}`} style={{ '--i': 2 }}>
-                    {/* Thread list */}
-                    <div className="ib-list">
-                        {filtered.map(t => {
-                            const p = platformMeta[t.platform] || {};
-                            const lastMsg = t.messages[t.messages.length - 1];
-                            return (
-                                <div
-                                    key={t.id}
-                                    className={`ib-thread ${t.unread ? 'unread' : ''} ${selected === t.id ? 'selected' : ''}`}
-                                    onClick={() => selectThread(t.id)}
+                {/* ── Sidebar ── */}
+                <div className="ib-sidebar">
+                    <div className="ib-header">
+                        <div className="ib-title">
+                            <h1>Inbox</h1>
+                            {threads.length > 0 && (
+                                <span className="ib-badge">{threads.filter(t => t.unread).length} new</span>
+                            )}
+                        </div>
+                        <div className="ib-platform-tabs">
+                            <button
+                                className={`ib-tab ${activePlatform === 'all' ? 'active' : ''}`}
+                                onClick={() => setActivePlatform('all')}
+                            >All</button>
+                            {Object.entries(platformMeta).map(([key, meta]) => (
+                                <button
+                                    key={key}
+                                    className={`ib-tab ${activePlatform === key ? 'active' : ''}`}
+                                    onClick={() => setActivePlatform(key)}
+                                    title={meta.name}
                                 >
-                                    <div className="ib-thread-avatar">{t.avatar}</div>
-                                    <div className="ib-thread-body">
-                                        <div className="ib-thread-top">
-                                            <span className="ib-thread-name">
-                                                {t.name}
-                                                {t.vip && <span className="ib-vip-badge">VIP</span>}
-                                            </span>
-                                            <span className="ib-thread-time">{lastMsg.time}</span>
-                                        </div>
-                                        <div className="ib-thread-bottom">
-                                            <p className="ib-thread-preview">{lastMsg.text}</p>
-                                            <div className="ib-thread-tags">
-                                                <span className="ib-thread-badge" style={{ '--ch': p.color }}>{p.abbr}</span>
-                                                {t.tags.slice(0, 1).map(tag => (
-                                                    <span key={tag} className="ib-tag">{tag}</span>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    {t.unread && <span className="ib-dot" />}
-                                    {t.flagged && <span className="ib-flag">🚩</span>}
-                                </div>
-                            );
-                        })}
+                                    {meta.icon}
+                                </button>
+                            ))}
+                        </div>
                     </div>
 
-                    {/* Conversation pane */}
-                    <div className="ib-convo">
-                        {activeThread ? (
-                            <>
-                                <div className="ib-convo-head">
-                                    <div className="ib-convo-who">
-                                        <div className="ib-convo-avatar">{activeThread.avatar}</div>
-                                        <div>
-                                            <span className="ib-convo-name">
-                                                {activeThread.name}
-                                                {activeThread.vip && <span className="ib-vip-badge">VIP</span>}
-                                            </span>
-                                            <span className="ib-convo-handle">{activeThread.from}</span>
+                    <div className="ib-search-filter">
+                        <input
+                            type="text"
+                            placeholder="Search conversations..."
+                            className="ib-search-input"
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                        />
+                        <div className="ib-filter-tags">
+                            {['All', 'Unread', 'Flagged'].map(f => (
+                                <button
+                                    key={f}
+                                    className={`ib-filter-tag ${filter === f.toLowerCase() ? 'active' : ''}`}
+                                    onClick={() => setFilter(f.toLowerCase())}
+                                >{f}</button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="ib-thread-list">
+                        {/* WhatsApp not connected notice */}
+                        {fetchState === 'not_connected' && threads.filter(t => t.platform === 'whatsapp').length === 0 && (
+                            <div className="ib-not-connected">
+                                <div className="ib-not-connected-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                        <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+                                    </svg>
+                                </div>
+                                <p>WhatsApp not connected</p>
+                                <span>Go to <strong>Accounts</strong> to connect your WhatsApp.</span>
+                            </div>
+                        )}
+
+                        {/* Initial loading progress */}
+                        {fetchState === 'loading' && threads.filter(t => t.platform === 'whatsapp').length === 0 && (
+                            <div className="ib-progress-container">
+                                <div className="ib-progress-label">
+                                    <span>{fetchProgress.message || 'Loading chats...'}</span>
+                                    <span>{pct}%</span>
+                                </div>
+                                <div className="ib-progress-track">
+                                    <div className="ib-progress-bar" style={{ width: `${pct}%` }} />
+                                </div>
+                                <p className="ib-progress-sub">This may take a moment the first time</p>
+                            </div>
+                        )}
+
+                        {/* Fetch error */}
+                        {fetchState === 'error' && threads.length === 0 && (
+                            <div className="ib-fetch-error">
+                                <div className="ib-fetch-error-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                                        <circle cx="12" cy="12" r="10" />
+                                        <line x1="12" y1="8" x2="12" y2="12" />
+                                        <circle cx="12" cy="16" r="0.5" fill="currentColor" />
+                                    </svg>
+                                </div>
+                                <p>Failed to fetch chats</p>
+                                <span>Check that your backend is running and WhatsApp is connected.</span>
+                                <button className="ib-retry-btn" onClick={retryFetch}>
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M1 4v6h6" /><path d="M3.51 15a9 9 0 1 0 .49-4.6" />
+                                    </svg>
+                                    Retry
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Background refetch bar */}
+                        {fetchState === 'loading' && threads.filter(t => t.platform === 'whatsapp').length > 0 && (
+                            <div className="ib-refetch-bar">
+                                <div className="ib-refetch-fill" style={{ width: `${pct}%` }} />
+                                <span>{fetchProgress.message}</span>
+                            </div>
+                        )}
+
+                        {/* Thread list */}
+                        {(fetchState !== 'loading' || threads.length > 0) ? (
+                            filtered.length === 0 ? (
+                                <div className="ib-empty-list">
+                                    <p>{fetchState === 'done' ? 'No conversations found' : ''}</p>
+                                </div>
+                            ) : (
+                                filtered.map(t => {
+                                    const p = platformMeta[t.platform] || {};
+                                    const lastMsg = t.messages[t.messages.length - 1];
+                                    return (
+                                        <div
+                                            key={t.id}
+                                            className={`ib-thread-card ${selected === t.id ? 'active' : ''} ${t.unread ? 'unread' : ''}`}
+                                            onClick={() => selectThread(t.id)}
+                                        >
+                                            <div className="ib-card-avatar" style={{ '--av-color': p.color }}>
+                                                {t.avatar}
+                                                <div className="ib-platform-icon">{p.icon}</div>
+                                            </div>
+                                            <div className="ib-card-content">
+                                                <div className="ib-card-top">
+                                                    <span className="ib-card-name">{t.name}</span>
+                                                    <span className="ib-card-time">{lastMsg?.time}</span>
+                                                </div>
+                                                <p className="ib-card-preview">{lastMsg?.text}</p>
+                                            </div>
+                                            {t.unread && <div className="ib-unread-dot" />}
                                         </div>
-                                    </div>
-                                    <div className="ib-convo-meta">
-                                        <span className="ib-convo-platform" style={{ '--ch': platformMeta[activeThread.platform]?.color }}>
-                                            {platformMeta[activeThread.platform]?.abbr}
-                                        </span>
-                                        {activeThread.tags.map(tag => (
-                                            <span key={tag} className="ib-convo-tag">{tag}</span>
-                                        ))}
+                                    );
+                                })
+                            )
+                        ) : null}
+                    </div>
+                </div>
+
+                {/* ── Main Chat Area ── */}
+                <div className="ib-main">
+                    {activeThread ? (
+                        <>
+                            <div className="ib-chat-header">
+                                <div className="ib-chat-info">
+                                    <div className="ib-chat-avatar"
+                                        style={{ background: `color-mix(in srgb, ${platformMeta[activeThread.platform]?.color} 15%, transparent)`, color: platformMeta[activeThread.platform]?.color }}
+                                    >{activeThread.avatar}</div>
+                                    <div>
+                                        <h2>{activeThread.name}</h2>
+                                        <span>via {platformMeta[activeThread.platform]?.name}</span>
                                     </div>
                                 </div>
-                                <div className="ib-messages">
-                                    {activeThread.messages.map((m, idx) => (
-                                        <div key={idx} className={`ib-msg ${m.incoming ? 'in' : 'out'}`}>
+                                <div className="ib-header-actions">
+                                    <button className={`ib-ai-toggle ${showAI ? 'active' : ''}`} onClick={() => setShowAI(!showAI)}>
+                                        ✦ AI Assistant
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="ib-messages-area">
+                                {activeThread.messages.map((m, idx) => (
+                                    <div key={idx} className={`ib-message-row ${m.incoming ? 'incoming' : 'outgoing'}`}>
+                                        <div className="ib-bubble">
                                             <p>{m.text}</p>
                                             <span className="ib-msg-time">{m.time}</span>
                                         </div>
-                                    ))}
-                                </div>
-                                <div className="ib-reply">
-                                    <input
-                                        type="text"
-                                        placeholder="Type a reply…"
-                                        value={replyText}
-                                        onChange={e => setReplyText(e.target.value)}
-                                        onKeyDown={e => e.key === 'Enter' && sendReply()}
-                                    />
-                                    <button className="ib-send" onClick={sendReply} disabled={!replyText.trim()}>
-                                        <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2L9 11" /><path d="M18 2l-6 16-3-7-7-3 16-6z" /></svg>
-                                    </button>
-                                </div>
-                            </>
-                        ) : (
-                            <div className="ib-empty">
-                                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
-                                <p>Select a conversation</p>
-                                <span>Choose a thread to view messages and AI suggestions</span>
+                                    </div>
+                                ))}
+                                <div ref={messagesBottomRef} />
                             </div>
-                        )}
-                    </div>
 
-                    {/* ── AI Assistant Panel ── */}
-                    {showAI && (
-                        <div className="ib-ai-panel">
-                            {activeThread ? (
-                                <>
-                                    <div className="ib-ai-section">
-                                        <h3 className="ib-ai-title">
-                                            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M10 2l1 4 4 1-4 1-1 4-1-4-4-1 4-1 1-4z" /></svg>
-                                            AI Suggestions
-                                        </h3>
-                                        {aiLoading ? (
-                                            <div className="ib-ai-loading">
-                                                <div className="ib-ai-spinner" />
-                                                <span>Analyzing conversation…</span>
-                                            </div>
-                                        ) : (
-                                            <div className="ib-ai-replies">
-                                                {aiSuggestions.map((s, i) => (
-                                                    <div key={i} className="ib-ai-reply">
-                                                        <p>{s}</p>
-                                                        <button onClick={() => applySuggestion(s)}>Use this</button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* AI Summary & Intent */}
-                                    <div className="ib-ai-section">
-                                        <h3 className="ib-ai-title">
-                                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M2 4h12M2 8h8M2 12h10" /></svg>
-                                            Summary
-                                        </h3>
-                                        {aiSummary && <p className="ib-ai-summary">{aiSummary}</p>}
-                                    </div>
-
-                                    <div className="ib-ai-section">
-                                        <h3 className="ib-ai-title">
-                                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4"><circle cx="8" cy="8" r="6" /><path d="M8 5v3l2 2" /></svg>
-                                            Detected Intent
-                                        </h3>
-                                        {aiIntent && (
-                                            <span className={`ib-intent-badge ${aiIntent.toLowerCase()}`}>
-                                                {aiIntent}
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    {/* Quick actions */}
-                                    <div className="ib-ai-section">
-                                        <h3 className="ib-ai-title">Quick Actions</h3>
-                                        <div className="ib-ai-actions">
-                                            <button className="ib-ai-action">📋 Save as FAQ</button>
-                                            <button className="ib-ai-action">🏷️ Add Tag</button>
-                                            <button className="ib-ai-action">👤 Escalate</button>
-                                            <button className="ib-ai-action">⭐ Mark VIP</button>
-                                        </div>
-                                    </div>
-
-                                    {/* Auto-reply safety */}
-                                    <div className="ib-ai-section">
-                                        <h3 className="ib-ai-title">
-                                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4"><path d="M8 1v6l4 2" /><circle cx="8" cy="8" r="7" /></svg>
-                                            Safety Controls
-                                        </h3>
-                                        <div className="ib-safety-controls">
-                                            {Object.entries(platformMeta).map(([key, val]) => (
-                                                <div key={key} className="ib-safety-row">
-                                                    <span style={{ color: val.color }}>{val.abbr}</span>
-                                                    <span className="ib-safety-label">Auto-reply</span>
-                                                    <label className="ib-toggle">
-                                                        <input type="checkbox" checked={autoReply[key]} onChange={() => toggleAutoReply(key)} />
-                                                        <span className="ib-toggle-track" />
-                                                    </label>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </>
-                            ) : (
-                                <div className="ib-ai-empty">
-                                    <svg width="32" height="32" viewBox="0 0 20 20" fill="none" stroke="rgba(138,43,226,0.25)" strokeWidth="1.2"><path d="M10 2l1 4 4 1-4 1-1 4-1-4-4-1 4-1 1-4z" /><path d="M15 12l.5 2 2 .5-2 .5-.5 2-.5-2-2-.5 2-.5.5-2z" /></svg>
-                                    <p>AI Assistant</p>
-                                    <span>Select a conversation to get AI-powered suggestions</span>
-                                </div>
-                            )}
+                            <div className="ib-input-area">
+                                <input
+                                    type="text"
+                                    placeholder={`Reply via ${platformMeta[activeThread.platform]?.name}…`}
+                                    value={replyText}
+                                    onChange={e => setReplyText(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && sendReply()}
+                                    disabled={sendingReply}
+                                />
+                                <button
+                                    className={`ib-send-btn ${sendingReply ? 'sending' : ''}`}
+                                    onClick={sendReply}
+                                    disabled={sendingReply || !replyText.trim()}
+                                >
+                                    {sendingReply ? (
+                                        <span className="ib-send-spinner" />
+                                    ) : (
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <path d="M22 2L11 13" /><path d="M22 2l-7 20-4-9-9-4 20-7z" />
+                                        </svg>
+                                    )}
+                                </button>
+                                {sendError && <div className="ib-send-error">{sendError}</div>}
+                            </div>
+                        </>
+                    ) : (
+                        <div className="ib-no-selection">
+                            <div className="ib-placeholder-icon">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1">
+                                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                                </svg>
+                            </div>
+                            <h3>Select a conversation</h3>
+                            <p>Choose a thread from the sidebar to view messages and AI insights.</p>
                         </div>
                     )}
                 </div>
+
+                {/* ── AI Panel ── */}
+                {showAI && activeThread && (
+                    <div className="ib-ai-sidebar">
+                        <div className="ib-ai-header">
+                            <h3>AI Insights</h3>
+                        </div>
+                        <div className="ib-ai-content">
+                            {aiLoading ? (
+                                <div className="ib-ai-loading">Analyzing conversation…</div>
+                            ) : (
+                                <>
+                                    <div className="ib-ai-card">
+                                        <h4>Intent Detected</h4>
+                                        <div className="ib-intent-tag">{aiIntent}</div>
+                                    </div>
+
+                                    <div className="ib-ai-card">
+                                        <h4>Last Message Context</h4>
+                                        <p className="ib-ai-summary">{aiSummary}</p>
+                                    </div>
+
+                                    <div className="ib-ai-card">
+                                        <h4>Smart Replies</h4>
+                                        <div className="ib-suggestions">
+                                            {aiSuggestions.map((s, i) => (
+                                                <button key={i} onClick={() => setReplyText(s)}>{s}</button>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="ib-ai-card">
+                                        <h4>Auto-Reply Settings</h4>
+                                        {Object.entries(platformMeta).map(([key, val]) => (
+                                            <div key={key} className="ib-setting-row">
+                                                <span>{val.name}</span>
+                                                <label className="ib-switch">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={autoReply[key]}
+                                                        onChange={() => toggleAutoReply(key)}
+                                                    />
+                                                    <span className="ib-slider"></span>
+                                                </label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                )}
             </div>
         </MainLayout>
     );

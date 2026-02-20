@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import MainLayout from '../../components/Layout/MainLayout';
+import { useAuth } from '../../contexts/AuthContext';
 import { io } from 'socket.io-client';
 import { QRCodeSVG } from 'qrcode.react';
 import './Accounts.css';
@@ -45,7 +46,6 @@ const platforms = [
     },
 ];
 
-/* All platforms start as NOT connected */
 const initialConnectionData = {
     instagram: { connected: false, handle: null, lastSync: null, stats: {} },
     twitter: { connected: false, handle: null, lastSync: null, stats: {} },
@@ -54,56 +54,122 @@ const initialConnectionData = {
 };
 
 const Accounts = () => {
+    const { userData, updateUserData } = useAuth();
     const [loaded, setLoaded] = useState(false);
     const [connections, setConnections] = useState(initialConnectionData);
-    const [qrModal, setQrModal] = useState(null); // null or platform id
+    const [qrModal, setQrModal] = useState(null);
     const [qrCode, setQrCode] = useState('');
-    const [qrStatus, setQrStatus] = useState('loading'); // 'loading' | 'scanning' | 'authenticating' | 'error'
-    const socketRef = useRef(null);
+    // 'idle' | 'starting' | 'scanning' | 'authenticating' | 'error'
+    const [qrStatus, setQrStatus] = useState('idle');
+    // Only the WhatsApp card shows a "Checking…" chip while we verify it
+    const [waChecking, setWaChecking] = useState(false);
 
-    // Connect to backend socket on mount and check WhatsApp status
+    const socketRef = useRef(null);
+    const qrTimeoutRef = useRef(null);
+
+    // ── Load Firestore state on mount ──────────────────────────────────────
     useEffect(() => {
         requestAnimationFrame(() => setLoaded(true));
 
+        if (userData?.connectedAccounts) {
+            const ca = userData.connectedAccounts;
+            setConnections(prev => ({
+                ...prev,
+                whatsapp: ca.whatsapp?.connected
+                    ? { connected: true, handle: 'WhatsApp Business', lastSync: 'Synced', stats: {} }
+                    : prev.whatsapp,
+                twitter: ca.twitter?.connected
+                    ? { connected: true, handle: '@connected', lastSync: 'Synced', stats: {} }
+                    : prev.twitter,
+                instagram: ca.instagram?.connected
+                    ? { connected: true, handle: '@connected', lastSync: 'Synced', stats: {} }
+                    : prev.instagram,
+                telegram: ca.telegram?.connected
+                    ? { connected: true, handle: '@connected', lastSync: 'Synced', stats: {} }
+                    : prev.telegram,
+            }));
+        }
+    }, [userData]);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            clearTimeout(qrTimeoutRef.current);
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+                socketRef.current = null;
+            }
+        };
+    }, []);
+
+    // ── Mark connected ─────────────────────────────────────────────────────
+    const markWhatsAppConnected = useCallback(() => {
+        setConnections(prev => ({
+            ...prev,
+            whatsapp: {
+                connected: true,
+                handle: 'WhatsApp Business',
+                lastSync: 'Just now',
+                stats: { conversations: 0, unread: 0 }
+            }
+        }));
+        updateUserData({
+            'connectedAccounts.whatsapp': {
+                connected: true,
+                connectedAt: new Date().toISOString()
+            }
+        });
+    }, [updateUserData]);
+
+    // ── Lazy socket: create only when needed, reuse if already open ────────
+    const ensureSocket = useCallback(() => {
+        if (socketRef.current?.connected) return socketRef.current;
+
+        // Disconnect stale socket if exists
+        if (socketRef.current) {
+            socketRef.current.disconnect();
+        }
+
         const socket = io('http://localhost:5000', {
+            transports: ['websocket'],    // skip polling upgrade → faster
             reconnectionAttempts: 5,
-            timeout: 10000
+            timeout: 10000,
         });
         socketRef.current = socket;
 
         socket.on('connect', () => {
-            console.log('Connected to WebSocket');
-            // Check if WhatsApp is already authenticated
-            socket.emit('get_whatsapp_status');
+            console.log('[Accounts] Socket connected');
         });
 
         socket.on('connect_error', (err) => {
-            console.error('Socket connection error:', err);
+            console.error('[Accounts] Socket error:', err.message);
+            setWaChecking(false);
+            setQrStatus('error');
+            setQrCode('error');
         });
 
-        socket.on('error', (msg) => {
-            console.error('Backend error:', msg);
+        // QR code received from backend — only update if value actually changed
+        socket.on('qr_code', (qr) => {
+            console.log('[Accounts] QR received');
+            setQrCode(prev => (prev === qr ? prev : qr));
+            setQrStatus('scanning');
+            clearTimeout(qrTimeoutRef.current);
         });
 
-        // WhatsApp status events
         socket.on('whatsapp_status', (status) => {
-            console.log('WhatsApp status:', status);
+            console.log('[Accounts] WA status:', status);
+            setWaChecking(false);
             if (status.ready) {
                 markWhatsAppConnected();
+                setQrModal(null);
+                setQrCode('');
             }
         });
 
-        socket.on('qr_code', (qr) => {
-            console.log('Received QR Code');
-            setQrCode(qr);
-            setQrStatus('scanning');
-        });
-
         socket.on('whatsapp_authenticated', () => {
-            console.log('WhatsApp Authenticated');
+            console.log('[Accounts] WA authenticated');
             setQrStatus('authenticating');
             markWhatsAppConnected();
-            // Close QR modal automatically after a brief "success" flash
             setTimeout(() => {
                 setQrModal(null);
                 setQrCode('');
@@ -111,7 +177,8 @@ const Accounts = () => {
         });
 
         socket.on('whatsapp_ready', () => {
-            console.log('WhatsApp Ready');
+            console.log('[Accounts] WA ready');
+            setWaChecking(false);
             markWhatsAppConnected();
             setQrModal(null);
             setQrCode('');
@@ -127,59 +194,132 @@ const Accounts = () => {
                 ...prev,
                 whatsapp: { connected: false, handle: null, lastSync: null, stats: {} }
             }));
+            updateUserData({
+                'connectedAccounts.whatsapp': { connected: false, connectedAt: null }
+            });
         });
 
-        return () => {
-            socket.disconnect();
-            socketRef.current = null;
-        };
-    }, []);
+        return socket;
+    }, [markWhatsAppConnected, updateUserData]);
 
-    const markWhatsAppConnected = () => {
-        setConnections(prev => ({
-            ...prev,
-            whatsapp: {
-                connected: true,
-                handle: 'WhatsApp Business',
-                lastSync: 'Just now',
-                stats: { conversations: 0, unread: 0 }
-            }
-        }));
-    };
-
-    const connectedCount = Object.values(connections).filter(c => c.connected).length;
-
-    const handleConnect = (id) => {
+    // ── Connect handler ────────────────────────────────────────────────────
+    const handleConnect = useCallback((id) => {
         const platform = platforms.find(p => p.id === id);
 
-        // WhatsApp uses QR code flow
         if (platform?.connectType === 'qr') {
+            // Open modal immediately (instant UX)
             setQrModal(id);
             setQrCode('');
-            setQrStatus('loading');
+            setQrStatus('starting');
 
-            // Tell backend to start WhatsApp if not already
-            if (socketRef.current) {
-                socketRef.current.emit('start_whatsapp');
+            // Now lazily connect the socket (in parallel with modal opening)
+            const socket = ensureSocket();
+
+            /* Check if already ready first — backend emits whatsapp_status */
+            if (socket.connected) {
+                socket.emit('get_whatsapp_status');
+                socket.emit('start_whatsapp');
+            } else {
+                // Will fire once connected
+                socket.once('connect', () => {
+                    socket.emit('get_whatsapp_status');
+                    socket.emit('start_whatsapp');
+                });
             }
+
+            // QR timeout: if no QR arrives in 12 s, show retry
+            clearTimeout(qrTimeoutRef.current);
+            qrTimeoutRef.current = setTimeout(() => {
+                setQrCode(prev => (prev ? prev : 'timeout'));
+            }, 12000);
             return;
         }
-        // Other platforms use OAuth (placeholder)
-        alert(`Opening OAuth flow for ${platform?.name}…`);
-    };
 
-    const handleCloseQr = () => {
+        // Non-QR OAuth placeholder
+        alert(`Opening OAuth flow for ${platform?.name}…`);
+    }, [ensureSocket]);
+
+    // ── Retry QR ──────────────────────────────────────────────────────────
+    const handleRetryQr = useCallback(() => {
+        setQrCode('');
+        setQrStatus('starting');
+        const socket = socketRef.current;
+        if (socket?.connected) {
+            socket.emit('start_whatsapp');
+        }
+        clearTimeout(qrTimeoutRef.current);
+        qrTimeoutRef.current = setTimeout(() => {
+            setQrCode(prev => (prev ? prev : 'timeout'));
+        }, 12000);
+    }, []);
+
+    const handleCloseQr = useCallback(() => {
         setQrModal(null);
         setQrCode('');
-    };
+        setQrStatus('idle');
+        clearTimeout(qrTimeoutRef.current);
+    }, []);
 
-    const handleDisconnect = (id) => {
+    const handleDisconnect = useCallback((id) => {
         if (window.confirm(`Disconnect from ${id}?`)) {
             setConnections(prev => ({
                 ...prev,
                 [id]: { ...prev[id], connected: false, handle: null, lastSync: null, stats: {} }
             }));
         }
+    }, []);
+
+    const connectedCount = Object.values(connections).filter(c => c.connected).length;
+
+    // ── QR modal content ───────────────────────────────────────────────────
+    const renderQrContent = () => {
+        if (qrStatus === 'authenticating') {
+            return (
+                <div className="qr-loading" style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: '48px', marginBottom: '10px' }}>✅</div>
+                    <span style={{ color: '#25D366', fontWeight: '600', fontSize: '14px' }}>Connected successfully!</span>
+                </div>
+            );
+        }
+        if (qrCode === 'error') {
+            return (
+                <div className="qr-error" style={{ textAlign: 'center', padding: '20px' }}>
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    <p style={{ color: '#000', margin: '10px 0 4px', fontSize: '13px', fontWeight: '600' }}>Connection Failed</p>
+                    <p style={{ color: '#666', margin: 0, fontSize: '11px' }}>Backend not reachable</p>
+                    <button
+                        onClick={handleRetryQr}
+                        style={{ marginTop: '12px', padding: '6px 14px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}
+                    >Retry</button>
+                </div>
+            );
+        }
+        if (qrCode === 'timeout') {
+            return (
+                <div className="qr-loading" style={{ textAlign: 'center', padding: '20px' }}>
+                    <p style={{ color: '#555', fontSize: '13px', fontWeight: '600', margin: '0 0 4px' }}>Still starting WhatsApp…</p>
+                    <p style={{ color: '#888', fontSize: '11px', margin: '0 0 12px' }}>This can take a few seconds on first run.</p>
+                    <button
+                        onClick={handleRetryQr}
+                        style={{ padding: '6px 14px', background: '#25D366', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}
+                    >Try again</button>
+                </div>
+            );
+        }
+        if (qrCode) {
+            return <QRCodeSVG value={qrCode} size={180} />;
+        }
+        // Spinner — starting / loading
+        return (
+            <div className="qr-loading">
+                <div className="spinner"></div>
+                <span style={{ color: '#000', marginTop: '10px', fontSize: '12px' }}>
+                    {qrStatus === 'starting' ? 'Starting WhatsApp…' : 'Generating QR…'}
+                </span>
+            </div>
+        );
     };
 
     return (
@@ -197,10 +337,11 @@ const Accounts = () => {
                     </div>
                 </div>
 
-                {/* ── Cards grid ── */}
+                {/* ── Cards grid — always rendered, no skeleton gating ── */}
                 <div className="acc-grid">
                     {platforms.map((p, idx) => {
                         const conn = connections[p.id];
+                        const isWaChecking = p.id === 'whatsapp' && waChecking;
                         return (
                             <div
                                 key={p.id}
@@ -209,13 +350,18 @@ const Accounts = () => {
                             >
                                 {/* Top row */}
                                 <div className="ac-top">
-                                    <div className="ac-icon" style={{ color: p.color }}>
-                                        {p.icon}
-                                    </div>
-                                    <span className={`ac-status ${conn.connected ? 'on' : 'off'}`}>
-                                        <span className="ac-status-dot" />
-                                        {conn.connected ? 'Connected' : 'Not connected'}
-                                    </span>
+                                    <div className="ac-icon" style={{ color: p.color }}>{p.icon}</div>
+                                    {isWaChecking ? (
+                                        <span className="ac-status checking">
+                                            <span className="ac-status-dot checking-dot" />
+                                            Checking…
+                                        </span>
+                                    ) : (
+                                        <span className={`ac-status ${conn.connected ? 'on' : 'off'}`}>
+                                            <span className="ac-status-dot" />
+                                            {conn.connected ? 'Connected' : 'Not connected'}
+                                        </span>
+                                    )}
                                 </div>
 
                                 {/* Info */}
@@ -230,12 +376,6 @@ const Accounts = () => {
                                 {conn.connected ? (
                                     <>
                                         <div className="ac-stats">
-                                            {Object.entries(conn.stats).map(([key, val]) => (
-                                                <div key={key} className="ac-stat">
-                                                    <span className="ac-stat-val">{val}</span>
-                                                    <span className="ac-stat-key">{key.replace('_', ' ')}</span>
-                                                </div>
-                                            ))}
                                             <div className="ac-stat">
                                                 <span className="ac-stat-val">{conn.lastSync}</span>
                                                 <span className="ac-stat-key">last sync</span>
@@ -249,10 +389,10 @@ const Accounts = () => {
                                 ) : (
                                     <>
                                         <ul className="ac-benefits">
-                                            <li>Automated posting & scheduling</li>
+                                            <li>Automated posting &amp; scheduling</li>
                                             <li>AI-powered responses</li>
                                             <li>Unified inbox</li>
-                                            <li>Analytics & insights</li>
+                                            <li>Analytics &amp; insights</li>
                                         </ul>
                                         <button
                                             className="ac-connect"
@@ -305,37 +445,15 @@ const Accounts = () => {
                                 <p>
                                     {qrStatus === 'authenticating'
                                         ? '✅ Authenticated! Connecting...'
-                                        : 'Scan this QR code with your WhatsApp mobile app to link your account.'}
+                                        : qrStatus === 'starting'
+                                            ? 'Starting WhatsApp session on the server…'
+                                            : 'Scan this QR code with your WhatsApp mobile app to link your account.'}
                                 </p>
                             </div>
 
                             <div className="qr-code-area">
                                 <div className="qr-code" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
-                                    {qrStatus === 'authenticating' ? (
-                                        <div className="qr-loading" style={{ textAlign: 'center' }}>
-                                            <div style={{ fontSize: '48px', marginBottom: '10px' }}>✅</div>
-                                            <span style={{ color: '#25D366', fontWeight: '600', fontSize: '14px' }}>Connected successfully!</span>
-                                        </div>
-                                    ) : qrCode === 'error' ? (
-                                        <div className="qr-error" style={{ textAlign: 'center', padding: '20px' }}>
-                                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                                <circle cx="12" cy="12" r="10"></circle>
-                                                <line x1="12" y1="8" x2="12" y2="12"></line>
-                                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                                            </svg>
-                                            <p style={{ color: '#000', margin: '10px 0 0', fontSize: '13px', fontWeight: '600' }}>Connection Failed</p>
-                                            <p style={{ color: '#666', margin: '4px 0 0', fontSize: '11px' }}>Backend not reachable</p>
-                                        </div>
-                                    ) : qrCode ? (
-                                        <QRCodeSVG value={qrCode} size={180} />
-                                    ) : (
-                                        <div className="qr-loading">
-                                            <div className="spinner"></div>
-                                            <span style={{ color: '#000', marginTop: '10px', fontSize: '12px' }}>
-                                                {qrStatus === 'loading' ? 'Initializing WhatsApp...' : 'Generating QR...'}
-                                            </span>
-                                        </div>
-                                    )}
+                                    {renderQrContent()}
                                     <div className="qr-scan-line" />
                                 </div>
                             </div>

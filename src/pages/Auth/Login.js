@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
-import { auth, googleProvider, githubProvider } from '../../firebase';
+import { doc, setDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { auth, db, googleProvider, githubProvider } from '../../firebase';
 import './Login.css';
 
 const Login = () => {
@@ -61,7 +62,10 @@ const Login = () => {
         setError('');
         setLoading(true);
         try {
-            await signInWithEmailAndPassword(auth, formData.email, formData.password);
+            const result = await signInWithEmailAndPassword(auth, formData.email, formData.password);
+            // Update lastLoginAt in Firestore
+            const userRef = doc(db, 'users', result.user.uid);
+            await setDoc(userRef, { lastLoginAt: serverTimestamp() }, { merge: true });
             navigate('/dashboard');
         } catch (err) {
             const code = err.code || '';
@@ -81,7 +85,29 @@ const Login = () => {
         setError('');
         setLoading(true);
         try {
-            await signInWithPopup(auth, googleProvider);
+            const result = await signInWithPopup(auth, googleProvider);
+            // Create Firestore doc if first-time Google login
+            const userRef = doc(db, 'users', result.user.uid);
+            const snap = await getDoc(userRef);
+            if (!snap.exists()) {
+                await setDoc(userRef, {
+                    uid: result.user.uid,
+                    displayName: result.user.displayName || '',
+                    email: result.user.email || '',
+                    photoURL: result.user.photoURL || null,
+                    provider: 'google',
+                    createdAt: serverTimestamp(),
+                    lastLoginAt: serverTimestamp(),
+                    connectedAccounts: {
+                        whatsapp: { connected: false, connectedAt: null },
+                        twitter: { connected: false, connectedAt: null },
+                        instagram: { connected: false, connectedAt: null },
+                        telegram: { connected: false, connectedAt: null }
+                    }
+                });
+            } else {
+                await setDoc(userRef, { lastLoginAt: serverTimestamp() }, { merge: true });
+            }
             navigate('/dashboard');
         } catch (err) {
             if (err.code !== 'auth/popup-closed-by-user') {
@@ -96,7 +122,29 @@ const Login = () => {
         setError('');
         setLoading(true);
         try {
-            await signInWithPopup(auth, githubProvider);
+            const result = await signInWithPopup(auth, githubProvider);
+            // Create Firestore doc if first-time GitHub login
+            const userRef = doc(db, 'users', result.user.uid);
+            const snap = await getDoc(userRef);
+            if (!snap.exists()) {
+                await setDoc(userRef, {
+                    uid: result.user.uid,
+                    displayName: result.user.displayName || '',
+                    email: result.user.email || '',
+                    photoURL: result.user.photoURL || null,
+                    provider: 'github',
+                    createdAt: serverTimestamp(),
+                    lastLoginAt: serverTimestamp(),
+                    connectedAccounts: {
+                        whatsapp: { connected: false, connectedAt: null },
+                        twitter: { connected: false, connectedAt: null },
+                        instagram: { connected: false, connectedAt: null },
+                        telegram: { connected: false, connectedAt: null }
+                    }
+                });
+            } else {
+                await setDoc(userRef, { lastLoginAt: serverTimestamp() }, { merge: true });
+            }
             navigate('/dashboard');
         } catch (err) {
             if (err.code !== 'auth/popup-closed-by-user') {
