@@ -46,6 +46,7 @@ let whatsappClient = null;
 let isWhatsAppReady = false;
 let lastQr = null;          // ← cached so new sockets get it instantly
 let isInitializing = false; // ← prevents parallel Puppeteer launches
+let waState = 'idle';       // idle | restoring | qr | ready | error
 
 
 
@@ -53,17 +54,23 @@ const initWhatsApp = async () => {
     if (whatsappClient) return; // Prevent multiple initializations
 
     console.log('Initializing WhatsApp Client...');
+    waState = 'restoring';
+    io.emit('wa_state', { state: waState });
+
     whatsappClient = new Client({
         authStrategy: new LocalAuth(),
         puppeteer: {
             headless: true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
+            timeout: 60000,
         }
     });
 
     whatsappClient.on('qr', (qr) => {
         console.log('QR Code generated at', Date.now());
         lastQr = qr; // ← cache it
+        waState = 'qr';
+        io.emit('wa_state', { state: waState });
         io.emit('qr_code', qr);
     });
 
@@ -72,6 +79,8 @@ const initWhatsApp = async () => {
         isWhatsAppReady = true;
         lastQr = null; // QR no longer needed once authenticated
         isInitializing = false;
+        waState = 'ready';
+        io.emit('wa_state', { state: waState });
         io.emit('whatsapp_ready');
     });
 
@@ -83,6 +92,8 @@ const initWhatsApp = async () => {
     whatsappClient.on('auth_failure', (msg) => {
         console.error('WhatsApp Auth Failure:', msg);
         isWhatsAppReady = false;
+        waState = 'error';
+        io.emit('wa_state', { state: waState });
         io.emit('whatsapp_auth_failure', msg);
     });
 
@@ -92,6 +103,8 @@ const initWhatsApp = async () => {
         isWhatsAppReady = false;
         lastQr = null;
         isInitializing = false;
+        waState = 'idle';
+        io.emit('wa_state', { state: waState });
         io.emit('whatsapp_disconnected');
     });
 
@@ -132,6 +145,7 @@ io.on('connection', (socket) => {
 
     // ① Always send current WA status immediately
     socket.emit('whatsapp_status', { initialized: !!whatsappClient, ready: isWhatsAppReady });
+    socket.emit('wa_state', { state: waState });
 
     // ② If ready, let the client know right away
     if (isWhatsAppReady) {
@@ -308,8 +322,15 @@ io.on('connection', (socket) => {
                     });
 
                     const contact = await chat.getContact();
-                    const messages = await chat.fetchMessages({ limit: 12 });
                     const contactName = contact.name || contact.pushname || contact.number || 'Unknown';
+
+                    let messages = [];
+                    try {
+                        // Increase resilience for individual chat fetch
+                        messages = await chat.fetchMessages({ limit: 12 });
+                    } catch (fetchErr) {
+                        console.warn(`[WA] Timeout fetching messages for ${contactName}, skipping message history.`);
+                    }
 
                     formattedChats.push({
                         id: chat.id._serialized,
@@ -597,3 +618,22 @@ server.listen(PORT, () => {
     console.log(`🔐 OAuth endpoints ready`);
     console.log(`📱 WhatsApp QR ready`);
 });
+
+// Graceful shutdown to prevent lingering Puppeteer/Chrome processes locking the session
+const gracefulShutdown = async (signal) => {
+    console.log(`\nReceived ${signal}. Shutting down gracefully...`);
+    if (whatsappClient) {
+        console.log('Destroying WhatsApp client...');
+        try {
+            await whatsappClient.destroy();
+            console.log('WhatsApp client destroyed.');
+        } catch (e) {
+            console.error('Error destroying WhatsApp client:', e.message);
+        }
+    }
+    process.exit(0);
+};
+
+process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.on('SIGUSR2', () => gracefulShutdown('SIGUSR2')); // Nodemon restarts

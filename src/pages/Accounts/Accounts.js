@@ -37,6 +37,7 @@ const platforms = [
     },
     {
         id: 'telegram', name: 'Telegram', color: '#0088CC', abbr: 'TG',
+        connectType: 'bot',
         icon: (
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 2L11 13" />
@@ -49,12 +50,12 @@ const platforms = [
 const initialConnectionData = {
     instagram: { connected: false, handle: null, lastSync: null, stats: {} },
     twitter: { connected: false, handle: null, lastSync: null, stats: {} },
-    whatsapp: { connected: false, handle: null, lastSync: null, stats: {} },
+    whatsapp: { linked: false, ready: false, handle: null, lastSync: null, stats: {} },
     telegram: { connected: false, handle: null, lastSync: null, stats: {} },
 };
 
 const Accounts = () => {
-    const { userData, updateUserData } = useAuth();
+    const { userData, updateUserData, loading: userLoading } = useAuth();
     const [loaded, setLoaded] = useState(false);
     const [connections, setConnections] = useState(initialConnectionData);
     const [qrModal, setQrModal] = useState(null);
@@ -76,8 +77,8 @@ const Accounts = () => {
             setConnections(prev => ({
                 ...prev,
                 whatsapp: ca.whatsapp?.connected
-                    ? { connected: true, handle: 'WhatsApp Business', lastSync: 'Synced', stats: {} }
-                    : prev.whatsapp,
+                    ? { ...prev.whatsapp, linked: true, handle: 'WhatsApp Business', lastSync: 'Restoring…' }
+                    : { ...prev.whatsapp, linked: false, ready: false },
                 twitter: ca.twitter?.connected
                     ? { connected: true, handle: '@connected', lastSync: 'Synced', stats: {} }
                     : prev.twitter,
@@ -107,7 +108,9 @@ const Accounts = () => {
         setConnections(prev => ({
             ...prev,
             whatsapp: {
-                connected: true,
+                ...prev.whatsapp,
+                linked: true,
+                ready: true,
                 handle: 'WhatsApp Business',
                 lastSync: 'Just now',
                 stats: { conversations: 0, unread: 0 }
@@ -115,6 +118,24 @@ const Accounts = () => {
         }));
         updateUserData({
             'connectedAccounts.whatsapp': {
+                connected: true,
+                connectedAt: new Date().toISOString()
+            }
+        });
+    }, [updateUserData]);
+
+    const markTelegramConnected = useCallback((handle) => {
+        setConnections(prev => ({
+            ...prev,
+            telegram: {
+                connected: true,
+                handle: handle ? `@${handle}` : 'Connected Bot',
+                lastSync: 'Just now',
+                stats: {}
+            }
+        }));
+        updateUserData({
+            'connectedAccounts.telegram': {
                 connected: true,
                 connectedAt: new Date().toISOString()
             }
@@ -166,22 +187,42 @@ const Accounts = () => {
             }
         });
 
+        socket.on('wa_state', (data) => {
+            console.log('[Accounts] WA state:', data.state);
+            if (data.state === 'ready') {
+                setConnections(prev => ({
+                    ...prev,
+                    whatsapp: { ...prev.whatsapp, linked: true, ready: true, lastSync: 'Just now' }
+                }));
+            } else if (data.state === 'restoring') {
+                setConnections(prev => ({
+                    ...prev,
+                    whatsapp: { ...prev.whatsapp, ready: false, lastSync: 'Restoring…' }
+                }));
+            } else if (data.state === 'error' || data.state === 'idle') {
+                setConnections(prev => ({
+                    ...prev,
+                    whatsapp: { ...prev.whatsapp, ready: false, lastSync: data.state === 'error' ? 'Connection Error' : 'Disconnected' }
+                }));
+            }
+        });
+
         socket.on('whatsapp_authenticated', () => {
             console.log('[Accounts] WA authenticated');
-            setQrStatus('authenticating');
-            markWhatsAppConnected();
-            setTimeout(() => {
-                setQrModal(null);
-                setQrCode('');
-            }, 800);
+            setQrStatus('authenticating'); // show "Authenticated... syncing"
+            // don't close modal yet
         });
 
         socket.on('whatsapp_ready', () => {
             console.log('[Accounts] WA ready');
+            setQrStatus('ready');
             setWaChecking(false);
             markWhatsAppConnected();
-            setQrModal(null);
-            setQrCode('');
+            setTimeout(() => {
+                setQrModal(null);
+                setQrCode('');
+                setQrStatus('idle');
+            }, 600);
         });
 
         socket.on('whatsapp_auth_failure', () => {
@@ -199,8 +240,18 @@ const Accounts = () => {
             });
         });
 
+        socket.on('telegram_connected', (data) => {
+            console.log('[Accounts] TG connected:', data);
+            markTelegramConnected(data.username);
+        });
+
+        socket.on('telegram_connect_error', (data) => {
+            console.error('[Accounts] TG connect error:', data?.error);
+            alert(`Failed to connect Telegram: ${data?.error}`);
+        });
+
         return socket;
-    }, [markWhatsAppConnected, updateUserData]);
+    }, [markWhatsAppConnected, markTelegramConnected, updateUserData]);
 
     // ── Connect handler ────────────────────────────────────────────────────
     const handleConnect = useCallback((id) => {
@@ -211,19 +262,29 @@ const Accounts = () => {
             setQrModal(id);
             setQrCode('');
             setQrStatus('starting');
+            setWaChecking(true);
 
             // Now lazily connect the socket (in parallel with modal opening)
             const socket = ensureSocket();
 
+            const startCb = (ack) => {
+                if (ack && !ack.ok) {
+                    setQrStatus('error');
+                    setQrCode('error');
+                } else if (ack && !ack.ready && !ack.hasQr) {
+                    setQrStatus('starting');
+                }
+            };
+
             /* Check if already ready first — backend emits whatsapp_status */
             if (socket.connected) {
                 socket.emit('get_whatsapp_status');
-                socket.emit('start_whatsapp');
+                socket.emit('start_whatsapp', startCb);
             } else {
                 // Will fire once connected
                 socket.once('connect', () => {
                     socket.emit('get_whatsapp_status');
-                    socket.emit('start_whatsapp');
+                    socket.emit('start_whatsapp', startCb);
                 });
             }
 
@@ -232,6 +293,18 @@ const Accounts = () => {
             qrTimeoutRef.current = setTimeout(() => {
                 setQrCode(prev => (prev ? prev : 'timeout'));
             }, 12000);
+            return;
+        }
+
+        if (platform?.id === 'telegram') {
+            const socket = ensureSocket();
+            if (socket.connected) {
+                socket.emit('connect_telegram');
+            } else {
+                socket.once('connect', () => {
+                    socket.emit('connect_telegram');
+                });
+            }
             return;
         }
 
@@ -245,7 +318,12 @@ const Accounts = () => {
         setQrStatus('starting');
         const socket = socketRef.current;
         if (socket?.connected) {
-            socket.emit('start_whatsapp');
+            socket.emit('start_whatsapp', (ack) => {
+                if (ack && !ack.ok) {
+                    setQrStatus('error');
+                    setQrCode('error');
+                }
+            });
         }
         clearTimeout(qrTimeoutRef.current);
         qrTimeoutRef.current = setTimeout(() => {
@@ -273,11 +351,19 @@ const Accounts = () => {
 
     // ── QR modal content ───────────────────────────────────────────────────
     const renderQrContent = () => {
-        if (qrStatus === 'authenticating') {
+        if (qrStatus === 'ready') {
             return (
                 <div className="qr-loading" style={{ textAlign: 'center' }}>
                     <div style={{ fontSize: '48px', marginBottom: '10px' }}>✅</div>
                     <span style={{ color: '#25D366', fontWeight: '600', fontSize: '14px' }}>Connected successfully!</span>
+                </div>
+            );
+        }
+        if (qrStatus === 'authenticating') {
+            return (
+                <div className="qr-loading" style={{ textAlign: 'center' }}>
+                    <div className="spinner" style={{ margin: '0 auto', marginBottom: '10px', borderColor: 'rgba(37, 211, 102, 0.2)', borderTopColor: '#25D366' }}></div>
+                    <span style={{ color: '#25D366', fontWeight: '600', fontSize: '14px' }}>Authenticated... syncing data</span>
                 </div>
             );
         }
@@ -351,10 +437,20 @@ const Accounts = () => {
                                 {/* Top row */}
                                 <div className="ac-top">
                                     <div className="ac-icon" style={{ color: p.color }}>{p.icon}</div>
-                                    {isWaChecking ? (
+                                    {userLoading ? (
+                                        <span className="ac-status off">
+                                            <span className="ac-status-dot" />
+                                            Loading…
+                                        </span>
+                                    ) : isWaChecking ? (
                                         <span className="ac-status checking">
                                             <span className="ac-status-dot checking-dot" />
                                             Checking…
+                                        </span>
+                                    ) : p.id === 'whatsapp' ? (
+                                        <span className={`ac-status ${conn.ready ? 'on' : conn.linked ? 'checking' : 'off'}`}>
+                                            <span className={`ac-status-dot ${conn.linked && !conn.ready ? 'checking-dot' : ''}`} />
+                                            {conn.ready ? 'Connected' : conn.linked ? 'Restoring…' : 'Not connected'}
                                         </span>
                                     ) : (
                                         <span className={`ac-status ${conn.connected ? 'on' : 'off'}`}>
@@ -367,13 +463,13 @@ const Accounts = () => {
                                 {/* Info */}
                                 <div className="ac-info">
                                     <h3>{p.name}</h3>
-                                    {conn.connected && conn.handle && (
+                                    {(p.id === 'whatsapp' ? conn.linked : conn.connected) && conn.handle && (
                                         <span className="ac-handle">{conn.handle}</span>
                                     )}
                                 </div>
 
                                 {/* Connected state */}
-                                {conn.connected ? (
+                                {(p.id === 'whatsapp' ? conn.linked : conn.connected) ? (
                                     <>
                                         <div className="ac-stats">
                                             <div className="ac-stat">
@@ -443,11 +539,13 @@ const Accounts = () => {
                                 </div>
                                 <h2>Connect WhatsApp</h2>
                                 <p>
-                                    {qrStatus === 'authenticating'
+                                    {qrStatus === 'ready'
                                         ? '✅ Authenticated! Connecting...'
-                                        : qrStatus === 'starting'
-                                            ? 'Starting WhatsApp session on the server…'
-                                            : 'Scan this QR code with your WhatsApp mobile app to link your account.'}
+                                        : qrStatus === 'authenticating'
+                                            ? 'Syncing chats please wait...'
+                                            : qrStatus === 'starting'
+                                                ? 'Starting WhatsApp session on the server…'
+                                                : 'Scan this QR code with your WhatsApp mobile app to link your account.'}
                                 </p>
                             </div>
 
