@@ -93,17 +93,26 @@ If you see a page about "Testing your use cases" or don't see WhatsApp/Instagram
 
 ---
 
-## 5. Update Your .env File
+## 5. Update Your .env File (Optional)
 
-Update your `backend/.env` file with the credentials you obtained:
+You can either set credentials in `.env` or connect via the Accounts page UI.
 
 ```env
-# Meta / WhatsApp
+# Meta WhatsApp Cloud API (optional — can also connect via Accounts UI)
 WHATSAPP_TOKEN=your_temporary_access_token
 WHATSAPP_PHONE_NUMBER_ID=your_phone_number_id
+WHATSAPP_WABA_ID=your_whatsapp_business_account_id
 WHATSAPP_VERIFY_TOKEN=flowsync_verify_token
 
 # Instagram
 INSTAGRAM_ACCESS_TOKEN=your_access_token
 INSTAGRAM_BUSINESS_ACCOUNT_ID=your_instagram_business_id
 ```
+
+## 6. Connect via FlowSync Accounts Page
+
+1. Go to **Accounts** in the app.
+2. Click **Connect WhatsApp via API**.
+3. Enter **Access Token**, **Phone Number ID**, and **WABA ID** from API Setup.
+4. Click **Connect**. The app validates credentials and marks WhatsApp connected on success.
+5. Configure the webhook in Meta: `https://your-backend-url/api/whatsapp/webhook`

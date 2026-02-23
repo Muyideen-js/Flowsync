@@ -2,10 +2,42 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import MainLayout from '../../components/Layout/MainLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { io } from 'socket.io-client';
-import { QRCodeSVG } from 'qrcode.react';
 import './Accounts.css';
 
-/* ── Platform brand config ── */
+const SOCKET_URL = 'http://localhost:5000';
+
+/**
+ * WhatsApp UI State Machine
+ *
+ * checking     → "Checking…"       (initial — waiting for server response)
+ * idle         → "Not connected"   (server confirmed: no session)
+ * restoring    → "Restoring…"      (session exists, Puppeteer loading)
+ * qr           → "Scan QR code"    (QR modal auto-opens)
+ * authenticated→ "Authenticated…"  (QR scanned, keys accepted)
+ * ready        → "Connected" ✅
+ * error        → "Connection error"
+ */
+const WA_LABEL = {
+    checking: 'Checking…',
+    idle: 'Not connected',
+    restoring: 'Generating QR…',
+    qr: 'Scan QR code',
+    authenticated: 'Authenticated…',
+    ready: 'Connected',
+    error: 'Connection error',
+};
+
+const WA_STATUS_CLASS = {
+    checking: 'off',
+    idle: 'off',
+    restoring: 'checking',
+    qr: 'checking',
+    authenticated: 'checking',
+    ready: 'on',
+    error: 'off',
+};
+
+/* ── Platform config ──────────────────────────────────── */
 const platforms = [
     {
         id: 'instagram', name: 'Instagram', color: '#E4405F', abbr: 'IG',
@@ -27,7 +59,6 @@ const platforms = [
     },
     {
         id: 'whatsapp', name: 'WhatsApp', color: '#25D366', abbr: 'WA',
-        connectType: 'qr',
         icon: (
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M3 21l1.5-5.5A9 9 0 1116.5 19L3 21z" />
@@ -37,7 +68,6 @@ const platforms = [
     },
     {
         id: 'telegram', name: 'Telegram', color: '#0088CC', abbr: 'TG',
-        connectType: 'bot',
         icon: (
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M22 2L11 13" />
@@ -47,371 +77,292 @@ const platforms = [
     },
 ];
 
-const initialConnectionData = {
-    instagram: { connected: false, handle: null, lastSync: null, stats: {} },
-    twitter: { connected: false, handle: null, lastSync: null, stats: {} },
-    whatsapp: { linked: false, ready: false, handle: null, lastSync: null, stats: {} },
-    telegram: { connected: false, handle: null, lastSync: null, stats: {} },
+const initialConnections = {
+    instagram: { connected: false, handle: null, lastSync: null },
+    twitter: { connected: false, handle: null, lastSync: null },
+    telegram: { connected: false, handle: null, lastSync: null },
 };
 
 const Accounts = () => {
     const { userData, updateUserData, loading: userLoading } = useAuth();
+
     const [loaded, setLoaded] = useState(false);
-    const [connections, setConnections] = useState(initialConnectionData);
-    const [qrModal, setQrModal] = useState(null);
+    const [connections, setConnections] = useState(initialConnections);
+
+    const [waState, setWaState] = useState('checking');
+    const [qrModal, setQrModal] = useState(false);
     const [qrCode, setQrCode] = useState('');
-    // 'idle' | 'starting' | 'scanning' | 'authenticating' | 'error'
-    const [qrStatus, setQrStatus] = useState('idle');
-    // Only the WhatsApp card shows a "Checking…" chip while we verify it
-    const [waChecking, setWaChecking] = useState(false);
+    const [tgModal, setTgModal] = useState(false);
+    const [tgChatId, setTgChatId] = useState('');
+    const [tgBotToken, setTgBotToken] = useState('');
+    const [tgSaving, setTgSaving] = useState(false);
 
     const socketRef = useRef(null);
-    const qrTimeoutRef = useRef(null);
+    const userIdRef = useRef(null);
+    // Tracks whether the QR modal was opened by the USER clicking the button.
+    // Prevents the background pre-warm from auto-popping the modal on page load.
+    const userOpenedModal = useRef(false);
 
-    // ── Load Firestore state on mount ──────────────────────────────────────
+    // Derived
+    const waReady = waState === 'ready';
+    const waBusy = ['restoring', 'authenticated', 'qr', 'checking'].includes(waState);
+    // Only lock the modal shut during 'authenticated' — user just scanned and we must not interrupt
+    const waModalLock = waState === 'authenticated';
+    const waLabel = WA_LABEL[waState] || 'Not connected';
+    const waClass = WA_STATUS_CLASS[waState] || 'off';
+    const qrSrc = qrCode
+        ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encodeURIComponent(qrCode)}`
+        : null;
+
+    /* ── Load page ──────────────────────────────────────── */
     useEffect(() => {
         requestAnimationFrame(() => setLoaded(true));
-
-        if (userData?.connectedAccounts) {
-            const ca = userData.connectedAccounts;
-            setConnections(prev => ({
-                ...prev,
-                whatsapp: ca.whatsapp?.connected
-                    ? { ...prev.whatsapp, linked: true, handle: 'WhatsApp Business', lastSync: 'Restoring…' }
-                    : { ...prev.whatsapp, linked: false, ready: false },
-                twitter: ca.twitter?.connected
-                    ? { connected: true, handle: '@connected', lastSync: 'Synced', stats: {} }
-                    : prev.twitter,
-                instagram: ca.instagram?.connected
-                    ? { connected: true, handle: '@connected', lastSync: 'Synced', stats: {} }
-                    : prev.instagram,
-                telegram: ca.telegram?.connected
-                    ? { connected: true, handle: '@connected', lastSync: 'Synced', stats: {} }
-                    : prev.telegram,
-            }));
-        }
-    }, [userData]);
-
-    // Cleanup on unmount
-    useEffect(() => {
-        return () => {
-            clearTimeout(qrTimeoutRef.current);
-            if (socketRef.current) {
-                socketRef.current.disconnect();
-                socketRef.current = null;
-            }
-        };
     }, []);
 
-    // ── Mark connected ─────────────────────────────────────────────────────
-    const markWhatsAppConnected = useCallback(() => {
+    /* ── Load other platform states from Firestore ──────── */
+    useEffect(() => {
+        if (!userData?.connectedAccounts) return;
+        const ca = userData.connectedAccounts;
         setConnections(prev => ({
             ...prev,
-            whatsapp: {
-                ...prev.whatsapp,
-                linked: true,
-                ready: true,
-                handle: 'WhatsApp Business',
-                lastSync: 'Just now',
-                stats: { conversations: 0, unread: 0 }
-            }
+            twitter: ca.twitter?.connected ? { connected: true, handle: ca.twitter.handle || '@connected', lastSync: 'Synced' } : prev.twitter,
+            instagram: ca.instagram?.connected ? { connected: true, handle: ca.instagram.handle || '@connected', lastSync: 'Synced' } : prev.instagram,
+            telegram: ca.telegram?.connected
+                ? { connected: true, handle: ca.telegram.chatId || ca.telegram.handle || 'Bot connected', lastSync: 'Synced' }
+                : prev.telegram,
         }));
-        updateUserData({
-            'connectedAccounts.whatsapp': {
-                connected: true,
-                connectedAt: new Date().toISOString()
-            }
-        });
-    }, [updateUserData]);
+        // Pre-fill Telegram modal fields from Firestore if available
+        if (ca.telegram?.chatId) setTgChatId(ca.telegram.chatId);
+        if (ca.telegram?.botToken) setTgBotToken(ca.telegram.botToken);
+    }, [userData]);
 
-    const markTelegramConnected = useCallback((handle) => {
-        setConnections(prev => ({
-            ...prev,
-            telegram: {
-                connected: true,
-                handle: handle ? `@${handle}` : 'Connected Bot',
-                lastSync: 'Just now',
-                stats: {}
-            }
-        }));
-        updateUserData({
-            'connectedAccounts.telegram': {
-                connected: true,
-                connectedAt: new Date().toISOString()
-            }
-        });
-    }, [updateUserData]);
+    /* ── Persistent socket — created once user is known ─── */
+    useEffect(() => {
+        // Wait until we have userData (Firebase UID)
+        if (!userData?.uid) return;
+        userIdRef.current = userData.uid;
 
-    // ── Lazy socket: create only when needed, reuse if already open ────────
-    const ensureSocket = useCallback(() => {
-        if (socketRef.current?.connected) return socketRef.current;
+        // Avoid recreating if already connected for same user
+        if (socketRef.current?.connected) return;
+        if (socketRef.current) socketRef.current.disconnect();
 
-        // Disconnect stale socket if exists
-        if (socketRef.current) {
-            socketRef.current.disconnect();
-        }
-
-        const socket = io('http://localhost:5000', {
-            transports: ['websocket'],    // skip polling upgrade → faster
-            reconnectionAttempts: 5,
+        const socket = io(SOCKET_URL, {
+            auth: { userId: userData.uid },   // ← private room key
+            transports: ['websocket'],
+            reconnectionAttempts: 10,
+            reconnectionDelay: 1500,
             timeout: 10000,
         });
         socketRef.current = socket;
 
         socket.on('connect', () => {
-            console.log('[Accounts] Socket connected');
+            console.log('[Accounts] Socket connected for user:', userData.uid.substring(0, 8));
+            socket.emit('get_whatsapp_status');
+            socket.emit('start_whatsapp');
+            // 🔄 Auto-reconnect Telegram bot from saved Firestore token
+            const savedToken = userData.connectedAccounts?.telegram?.botToken;
+            if (savedToken) {
+                socket.emit('connect_telegram_bot', { botToken: savedToken });
+            }
+        });
+
+        /* ─── Telegram state events ─── */
+        socket.on('tg_connected', (data) => {
+            const handle = data.username ? `@${data.username}` : 'Bot connected';
+            setConnections(prev => ({ ...prev, telegram: { connected: true, handle, lastSync: 'Just now' } }));
+        });
+
+        socket.on('tg_state', ({ state }) => {
+            if (state === 'idle' || state === 'error') {
+                // Keep Firestore-based connected state if we have a token saved
+                const savedToken = userData.connectedAccounts?.telegram?.botToken;
+                if (!savedToken) {
+                    setConnections(prev => ({ ...prev, telegram: { connected: false, handle: null, lastSync: null } }));
+                }
+            }
         });
 
         socket.on('connect_error', (err) => {
             console.error('[Accounts] Socket error:', err.message);
-            setWaChecking(false);
-            setQrStatus('error');
-            setQrCode('error');
+            setWaState(prev => prev === 'checking' ? 'idle' : prev);
         });
 
-        // QR code received from backend — only update if value actually changed
-        socket.on('qr_code', (qr) => {
-            console.log('[Accounts] QR received');
-            setQrCode(prev => (prev === qr ? prev : qr));
-            setQrStatus('scanning');
-            clearTimeout(qrTimeoutRef.current);
+        socket.on('tg_error', ({ error }) => {
+            console.error('[Accounts] Telegram error:', error);
+            // Show an inline error — alert used since Accounts has no toast system
+            const msg = error?.includes('404') || error?.includes('401')
+                ? '❌ Invalid bot token. Copy the token exactly from @BotFather and try again.'
+                : `❌ Telegram error: ${error}`;
+            alert(msg);
         });
 
-        socket.on('whatsapp_status', (status) => {
-            console.log('[Accounts] WA status:', status);
-            setWaChecking(false);
-            if (status.ready) {
-                markWhatsAppConnected();
-                setQrModal(null);
+        /* ─── WhatsApp state events ─── */
+        socket.on('wa_state', ({ state }) => {
+            setWaState(state);
+            // Only auto-open modal if the USER explicitly clicked the button
+            if (state === 'qr' && userOpenedModal.current) setQrModal(true);
+            if (state === 'ready') {
+                setQrModal(false);
                 setQrCode('');
+                userOpenedModal.current = false;
+                updateUserData({
+                    'connectedAccounts.whatsapp': { connected: true, connectedAt: new Date().toISOString() }
+                });
+            }
+            if (state === 'idle' || state === 'error') {
+                setQrCode('');
+                // Only close modal if user had it open
+                if (userOpenedModal.current) setQrModal(false);
+                userOpenedModal.current = false;
             }
         });
 
-        socket.on('wa_state', (data) => {
-            console.log('[Accounts] WA state:', data.state);
-            if (data.state === 'ready') {
-                setConnections(prev => ({
-                    ...prev,
-                    whatsapp: { ...prev.whatsapp, linked: true, ready: true, lastSync: 'Just now' }
-                }));
-            } else if (data.state === 'restoring') {
-                setConnections(prev => ({
-                    ...prev,
-                    whatsapp: { ...prev.whatsapp, ready: false, lastSync: 'Restoring…' }
-                }));
-            } else if (data.state === 'error' || data.state === 'idle') {
-                setConnections(prev => ({
-                    ...prev,
-                    whatsapp: { ...prev.whatsapp, ready: false, lastSync: data.state === 'error' ? 'Connection Error' : 'Disconnected' }
-                }));
-            }
-        });
-
-        socket.on('whatsapp_authenticated', () => {
-            console.log('[Accounts] WA authenticated');
-            setQrStatus('authenticating'); // show "Authenticated... syncing"
-            // don't close modal yet
+        socket.on('qr_code', (qr) => {
+            setQrCode(qr);
+            setWaState('qr');
+            // Only open modal if user wanted it
+            if (userOpenedModal.current) setQrModal(true);
         });
 
         socket.on('whatsapp_ready', () => {
-            console.log('[Accounts] WA ready');
-            setQrStatus('ready');
-            setWaChecking(false);
-            markWhatsAppConnected();
-            setTimeout(() => {
-                setQrModal(null);
-                setQrCode('');
-                setQrStatus('idle');
-            }, 600);
+            setWaState('ready');
+            setQrModal(false);
+            setQrCode('');
+            updateUserData({
+                'connectedAccounts.whatsapp': { connected: true, connectedAt: new Date().toISOString() }
+            });
         });
 
-        socket.on('whatsapp_auth_failure', () => {
-            setQrCode('error');
-            setQrStatus('error');
+        socket.on('whatsapp_authenticated', () => {
+            setWaState(prev => prev === 'ready' ? 'ready' : 'authenticated');
         });
 
         socket.on('whatsapp_disconnected', () => {
-            setConnections(prev => ({
-                ...prev,
-                whatsapp: { connected: false, handle: null, lastSync: null, stats: {} }
-            }));
-            updateUserData({
-                'connectedAccounts.whatsapp': { connected: false, connectedAt: null }
-            });
+            setWaState('idle');
+            setQrModal(false);
+            setQrCode('');
+            updateUserData({ 'connectedAccounts.whatsapp': { connected: false, connectedAt: null } });
         });
 
+        socket.on('whatsapp_auth_failure', () => {
+            setWaState('error');
+        });
+
+        socket.on('whatsapp_status', ({ ready }) => {
+            if (ready) setWaState('ready');
+        });
+
+        /* ─── Telegram events ─── */
         socket.on('telegram_connected', (data) => {
-            console.log('[Accounts] TG connected:', data);
-            markTelegramConnected(data.username);
+            const handle = data.username ? `@${data.username}` : 'Connected Bot';
+            setConnections(prev => ({ ...prev, telegram: { connected: true, handle, lastSync: 'Just now' } }));
+            updateUserData({ 'connectedAccounts.telegram': { connected: true, connectedAt: new Date().toISOString() } });
         });
 
         socket.on('telegram_connect_error', (data) => {
-            console.error('[Accounts] TG connect error:', data?.error);
-            alert(`Failed to connect Telegram: ${data?.error}`);
+            console.error('[Accounts] TG error:', data?.error);
+            alert(`Telegram connection failed: ${data?.error || 'Unknown error'}`);
         });
 
-        return socket;
-    }, [markWhatsAppConnected, markTelegramConnected, updateUserData]);
+        return () => {
+            socket.disconnect();
+            socketRef.current = null;
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [userData?.uid]);
 
-    // ── Connect handler ────────────────────────────────────────────────────
-    const handleConnect = useCallback((id) => {
-        const platform = platforms.find(p => p.id === id);
+    /* ── Handlers ─────────────────────────────────────────── */
+    const handleConnectWA = useCallback(() => {
+        // ✅ Always open modal first — never block on socket state
+        userOpenedModal.current = true;
+        setQrModal(true);
 
-        if (platform?.connectType === 'qr') {
-            // Open modal immediately (instant UX)
-            setQrModal(id);
-            setQrCode('');
-            setQrStatus('starting');
-            setWaChecking(true);
+        const socket = socketRef.current;
 
-            // Now lazily connect the socket (in parallel with modal opening)
-            const socket = ensureSocket();
+        // If QR is already ready (from pre-warm), just show it — no need to re-emit
+        if (waState === 'qr' || waState === 'ready') return;
 
-            const startCb = (ack) => {
-                if (ack && !ack.ok) {
-                    setQrStatus('error');
-                    setQrCode('error');
-                } else if (ack && !ack.ready && !ack.hasQr) {
-                    setQrStatus('starting');
-                }
-            };
+        // Move to restoring so the spinner shows if we're starting fresh
+        setWaState(prev => ['idle', 'error'].includes(prev) ? 'restoring' : prev);
 
-            /* Check if already ready first — backend emits whatsapp_status */
-            if (socket.connected) {
-                socket.emit('get_whatsapp_status');
-                socket.emit('start_whatsapp', startCb);
-            } else {
-                // Will fire once connected
-                socket.once('connect', () => {
-                    socket.emit('get_whatsapp_status');
-                    socket.emit('start_whatsapp', startCb);
-                });
-            }
-
-            // QR timeout: if no QR arrives in 12 s, show retry
-            clearTimeout(qrTimeoutRef.current);
-            qrTimeoutRef.current = setTimeout(() => {
-                setQrCode(prev => (prev ? prev : 'timeout'));
-            }, 12000);
+        if (!socket?.connected) {
+            // Socket not ready yet — it will auto-emit start_whatsapp on connect
             return;
         }
 
-        if (platform?.id === 'telegram') {
-            const socket = ensureSocket();
-            if (socket.connected) {
-                socket.emit('connect_telegram');
-            } else {
-                socket.once('connect', () => {
-                    socket.emit('connect_telegram');
-                });
+        socket.emit('start_whatsapp', (ack) => {
+            if (ack?.ready) {
+                setWaState('ready');
+                userOpenedModal.current = false;
+                setTimeout(() => setQrModal(false), 1200);
             }
-            return;
-        }
+        });
+    }, [waState]);
 
-        // Non-QR OAuth placeholder
-        alert(`Opening OAuth flow for ${platform?.name}…`);
-    }, [ensureSocket]);
-
-    // ── Retry QR ──────────────────────────────────────────────────────────
-    const handleRetryQr = useCallback(() => {
+    const handleResetWA = useCallback(() => {
+        const socket = socketRef.current;
+        if (socket?.connected) socket.emit('reset_whatsapp');
+        userOpenedModal.current = false;
+        setWaState('idle');
+        setQrModal(false);
         setQrCode('');
-        setQrStatus('starting');
+        updateUserData({ 'connectedAccounts.whatsapp': { connected: false, connectedAt: null } });
+    }, [updateUserData]);
+
+    const handleConnectTelegram = useCallback(() => {
+        setTgModal(true);
+    }, []);
+
+    const handleSaveTgChatId = useCallback(() => {
+        const token = tgBotToken.trim();
+        const chatId = tgChatId.trim();
+        if (!token) { alert('Please enter your bot token.'); return; }
+        setTgSaving(true);
+        // Save to Firestore for persistence
+        updateUserData({
+            'connectedAccounts.telegram': {
+                connected: true,
+                chatId,
+                handle: chatId || 'Bot',
+                botToken: token,
+                connectedAt: new Date().toISOString(),
+            }
+        });
+        // Start the bot on backend
         const socket = socketRef.current;
         if (socket?.connected) {
-            socket.emit('start_whatsapp', (ack) => {
-                if (ack && !ack.ok) {
-                    setQrStatus('error');
-                    setQrCode('error');
-                }
-            });
+            socket.emit('connect_telegram_bot', { botToken: token, chatId });
         }
-        clearTimeout(qrTimeoutRef.current);
-        qrTimeoutRef.current = setTimeout(() => {
-            setQrCode(prev => (prev ? prev : 'timeout'));
-        }, 12000);
-    }, []);
+        setConnections(prev => ({ ...prev, telegram: { connected: true, handle: chatId || '@bot', lastSync: 'Just now' } }));
+        setTgSaving(false);
+        setTgModal(false);
+    }, [tgChatId, tgBotToken, updateUserData]);
 
-    const handleCloseQr = useCallback(() => {
-        setQrModal(null);
-        setQrCode('');
-        setQrStatus('idle');
-        clearTimeout(qrTimeoutRef.current);
-    }, []);
+    const handleConnect = useCallback((id) => {
+        if (id === 'whatsapp') { handleConnectWA(); return; }
+        if (id === 'telegram') { handleConnectTelegram(); return; }
+        alert(`Opening OAuth flow for ${id}…`);
+    }, [handleConnectWA, handleConnectTelegram]);
 
     const handleDisconnect = useCallback((id) => {
-        if (window.confirm(`Disconnect from ${id}?`)) {
-            setConnections(prev => ({
-                ...prev,
-                [id]: { ...prev[id], connected: false, handle: null, lastSync: null, stats: {} }
-            }));
-        }
-    }, []);
+        if (!window.confirm(`Disconnect from ${id}?`)) return;
+        if (id === 'whatsapp') { handleResetWA(); return; }
+        setConnections(prev => ({ ...prev, [id]: { connected: false, handle: null, lastSync: null } }));
+    }, [handleResetWA]);
 
-    const connectedCount = Object.values(connections).filter(c => c.connected).length;
+    const connectedCount = [
+        waReady,
+        connections.instagram.connected,
+        connections.twitter.connected,
+        connections.telegram.connected,
+    ].filter(Boolean).length;
 
-    // ── QR modal content ───────────────────────────────────────────────────
-    const renderQrContent = () => {
-        if (qrStatus === 'ready') {
-            return (
-                <div className="qr-loading" style={{ textAlign: 'center' }}>
-                    <div style={{ fontSize: '48px', marginBottom: '10px' }}>✅</div>
-                    <span style={{ color: '#25D366', fontWeight: '600', fontSize: '14px' }}>Connected successfully!</span>
-                </div>
-            );
-        }
-        if (qrStatus === 'authenticating') {
-            return (
-                <div className="qr-loading" style={{ textAlign: 'center' }}>
-                    <div className="spinner" style={{ margin: '0 auto', marginBottom: '10px', borderColor: 'rgba(37, 211, 102, 0.2)', borderTopColor: '#25D366' }}></div>
-                    <span style={{ color: '#25D366', fontWeight: '600', fontSize: '14px' }}>Authenticated... syncing data</span>
-                </div>
-            );
-        }
-        if (qrCode === 'error') {
-            return (
-                <div className="qr-error" style={{ textAlign: 'center', padding: '20px' }}>
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
-                        <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-                    </svg>
-                    <p style={{ color: '#000', margin: '10px 0 4px', fontSize: '13px', fontWeight: '600' }}>Connection Failed</p>
-                    <p style={{ color: '#666', margin: 0, fontSize: '11px' }}>Backend not reachable</p>
-                    <button
-                        onClick={handleRetryQr}
-                        style={{ marginTop: '12px', padding: '6px 14px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}
-                    >Retry</button>
-                </div>
-            );
-        }
-        if (qrCode === 'timeout') {
-            return (
-                <div className="qr-loading" style={{ textAlign: 'center', padding: '20px' }}>
-                    <p style={{ color: '#555', fontSize: '13px', fontWeight: '600', margin: '0 0 4px' }}>Still starting WhatsApp…</p>
-                    <p style={{ color: '#888', fontSize: '11px', margin: '0 0 12px' }}>This can take a few seconds on first run.</p>
-                    <button
-                        onClick={handleRetryQr}
-                        style={{ padding: '6px 14px', background: '#25D366', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '12px', fontWeight: '600' }}
-                    >Try again</button>
-                </div>
-            );
-        }
-        if (qrCode) {
-            return <QRCodeSVG value={qrCode} size={180} />;
-        }
-        // Spinner — starting / loading
-        return (
-            <div className="qr-loading">
-                <div className="spinner"></div>
-                <span style={{ color: '#000', marginTop: '10px', fontSize: '12px' }}>
-                    {qrStatus === 'starting' ? 'Starting WhatsApp…' : 'Generating QR…'}
-                </span>
-            </div>
-        );
-    };
-
+    /* ── Render ───────────────────────────────────────────── */
     return (
         <MainLayout>
             <div className={`acc ${loaded ? 'loaded' : ''}`}>
-                {/* ── Header ── */}
+
+                {/* Header */}
                 <div className="acc-head anim-i" style={{ '--i': 0 }}>
                     <div>
                         <h1>Accounts</h1>
@@ -423,57 +374,39 @@ const Accounts = () => {
                     </div>
                 </div>
 
-                {/* ── Cards grid — always rendered, no skeleton gating ── */}
+                {/* Cards */}
                 <div className="acc-grid">
                     {platforms.map((p, idx) => {
-                        const conn = connections[p.id];
-                        const isWaChecking = p.id === 'whatsapp' && waChecking;
+                        const isWa = p.id === 'whatsapp';
+                        const conn = isWa ? null : connections[p.id];
+                        const isConn = isWa ? waReady : conn.connected;
+
                         return (
                             <div
                                 key={p.id}
-                                className={`acc-card anim-i ${conn.connected ? 'connected' : ''}`}
+                                className={`acc-card anim-i ${isConn ? 'connected' : ''}`}
                                 style={{ '--i': idx + 1, '--brand': p.color }}
                             >
-                                {/* Top row */}
                                 <div className="ac-top">
                                     <div className="ac-icon" style={{ color: p.color }}>{p.icon}</div>
-                                    {userLoading ? (
-                                        <span className="ac-status off">
-                                            <span className="ac-status-dot" />
-                                            Loading…
-                                        </span>
-                                    ) : isWaChecking ? (
-                                        <span className="ac-status checking">
-                                            <span className="ac-status-dot checking-dot" />
-                                            Checking…
-                                        </span>
-                                    ) : p.id === 'whatsapp' ? (
-                                        <span className={`ac-status ${conn.ready ? 'on' : conn.linked ? 'checking' : 'off'}`}>
-                                            <span className={`ac-status-dot ${conn.linked && !conn.ready ? 'checking-dot' : ''}`} />
-                                            {conn.ready ? 'Connected' : conn.linked ? 'Restoring…' : 'Not connected'}
-                                        </span>
-                                    ) : (
-                                        <span className={`ac-status ${conn.connected ? 'on' : 'off'}`}>
-                                            <span className="ac-status-dot" />
-                                            {conn.connected ? 'Connected' : 'Not connected'}
-                                        </span>
-                                    )}
+                                    <span className={`ac-status ${isWa ? waClass : (isConn ? 'on' : 'off')}`}>
+                                        <span className={`ac-status-dot ${(isWa && waBusy) ? 'checking-dot' : ''}`} />
+                                        {isWa
+                                            ? waLabel
+                                            : userLoading ? 'Loading…' : isConn ? 'Connected' : 'Not connected'}
+                                    </span>
                                 </div>
 
-                                {/* Info */}
                                 <div className="ac-info">
                                     <h3>{p.name}</h3>
-                                    {(p.id === 'whatsapp' ? conn.linked : conn.connected) && conn.handle && (
-                                        <span className="ac-handle">{conn.handle}</span>
-                                    )}
+                                    {isConn && !isWa && conn.handle && <span className="ac-handle">{conn.handle}</span>}
                                 </div>
 
-                                {/* Connected state */}
-                                {(p.id === 'whatsapp' ? conn.linked : conn.connected) ? (
+                                {isConn ? (
                                     <>
                                         <div className="ac-stats">
                                             <div className="ac-stat">
-                                                <span className="ac-stat-val">{conn.lastSync}</span>
+                                                <span className="ac-stat-val">{isWa ? 'Just now' : conn.lastSync}</span>
                                                 <span className="ac-stat-key">last sync</span>
                                             </div>
                                         </div>
@@ -492,10 +425,15 @@ const Accounts = () => {
                                         </ul>
                                         <button
                                             className="ac-connect"
-                                            style={{ '--brand': p.color }}
+                                            style={{ '--brand': p.color, opacity: (isWa && ['restoring', 'authenticated', 'checking'].includes(waState)) ? 0.6 : 1 }}
                                             onClick={() => handleConnect(p.id)}
+                                            disabled={isWa && ['restoring', 'authenticated'].includes(waState)}
                                         >
-                                            {p.connectType === 'qr' ? `Scan QR to connect ${p.name}` : `Connect ${p.name}`}
+                                            {isWa && waState === 'qr'
+                                                ? '📱 Scan QR Code'
+                                                : isWa && ['restoring', 'checking', 'authenticated'].includes(waState)
+                                                    ? waLabel
+                                                    : `Connect ${p.name}`}
                                         </button>
                                     </>
                                 )}
@@ -504,13 +442,12 @@ const Accounts = () => {
                     })}
                 </div>
 
-                {/* ── Info banner ── */}
+                {/* Banner */}
                 {connectedCount < platforms.length && (
                     <div className="acc-banner anim-i" style={{ '--i': platforms.length + 1 }}>
                         <div className="ab-icon">
                             <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
-                                <circle cx="10" cy="10" r="8" />
-                                <path d="M10 6.5v4" />
+                                <circle cx="10" cy="10" r="8" /><path d="M10 6.5v4" />
                                 <circle cx="10" cy="14" r="0.5" fill="currentColor" stroke="none" />
                             </svg>
                         </div>
@@ -520,11 +457,12 @@ const Accounts = () => {
                     </div>
                 )}
 
-                {/* ═══ QR Code Modal ═══ */}
+                {/* ════ WhatsApp QR Modal ════ */}
                 {qrModal && (
-                    <div className="qr-overlay" onClick={handleCloseQr}>
-                        <div className="qr-modal" onClick={(e) => e.stopPropagation()}>
-                            <button className="qr-close" onClick={handleCloseQr}>
+                    <div className="qr-overlay" onClick={() => !waModalLock && setQrModal(false)}>
+                        <div className="qr-modal" onClick={e => e.stopPropagation()}>
+
+                            <button className="qr-close" onClick={() => { if (!waModalLock) setQrModal(false); }} disabled={waModalLock}>
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
                                     <path d="M18 6L6 18M6 6l12 12" />
                                 </svg>
@@ -534,45 +472,216 @@ const Accounts = () => {
                                 <div className="qr-icon-wrap" style={{ '--brand': '#25D366' }}>
                                     <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M3 21l1.5-5.5A9 9 0 1116.5 19L3 21z" />
-                                        <path d="M9 10a1.5 1.5 0 011.5 1.5A3 3 0 0013.5 14h1A1.5 1.5 0 0116 12.5" />
                                     </svg>
                                 </div>
                                 <h2>Connect WhatsApp</h2>
-                                <p>
-                                    {qrStatus === 'ready'
-                                        ? '✅ Authenticated! Connecting...'
-                                        : qrStatus === 'authenticating'
-                                            ? 'Syncing chats please wait...'
-                                            : qrStatus === 'starting'
-                                                ? 'Starting WhatsApp session on the server…'
-                                                : 'Scan this QR code with your WhatsApp mobile app to link your account.'}
-                                </p>
+                                <p>Scan with your phone to mirror your WhatsApp chats in FlowSync.</p>
                             </div>
 
                             <div className="qr-code-area">
-                                <div className="qr-code" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff' }}>
-                                    {renderQrContent()}
-                                    <div className="qr-scan-line" />
-                                </div>
+                                {waState === 'restoring' && (
+                                    <div className="qr-spinner-wrap">
+                                        <div className="qr-spinner" />
+                                        <p>Generating QR code…</p>
+                                        <p style={{ fontSize: '11px', opacity: 0.5, marginTop: '6px' }}>This takes 10–20 seconds on first launch</p>
+                                    </div>
+                                )}
+                                {waState === 'qr' && qrSrc && (
+                                    <img src={qrSrc} alt="WhatsApp QR Code" className="qr-image" />
+                                )}
+                                {waState === 'qr' && !qrSrc && (
+                                    <div className="qr-spinner-wrap">
+                                        <div className="qr-spinner" /><p>Generating QR…</p>
+                                    </div>
+                                )}
+                                {waState === 'authenticated' && (
+                                    <div className="qr-spinner-wrap">
+                                        <div className="qr-spinner" style={{ borderTopColor: '#25D366' }} />
+                                        <p>✅ QR scanned! Syncing chats…</p>
+                                    </div>
+                                )}
+                                {waState === 'ready' && (
+                                    <div className="qr-spinner-wrap">
+                                        <p style={{ fontSize: '2.5rem' }}>✅</p>
+                                        <p style={{ fontWeight: 600 }}>WhatsApp Connected!</p>
+                                    </div>
+                                )}
+                                {waState === 'error' && (
+                                    <div className="qr-spinner-wrap">
+                                        <p style={{ color: '#ef4444', fontSize: '1rem' }}>❌ Connection failed.</p>
+                                        <button className="ac-btn" style={{ marginTop: '12px' }} onClick={handleConnectWA}>Retry</button>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="qr-steps">
-                                <div className="qr-step">
-                                    <span className="qr-step-num">1</span>
-                                    <span>Open WhatsApp on your phone</span>
-                                </div>
-                                <div className="qr-step">
-                                    <span className="qr-step-num">2</span>
-                                    <span>Go to <strong>Settings → Linked Devices</strong></span>
-                                </div>
-                                <div className="qr-step">
-                                    <span className="qr-step-num">3</span>
-                                    <span>Tap <strong>Link a Device</strong> and scan this code</span>
-                                </div>
+                                <div className="qr-step"><span className="qr-step-num">1</span><span>Open WhatsApp on your phone</span></div>
+                                <div className="qr-step"><span className="qr-step-num">2</span><span>Tap Menu (⋮) → Linked Devices</span></div>
+                                <div className="qr-step"><span className="qr-step-num">3</span><span>Tap "Link a Device" and scan</span></div>
                             </div>
+
+                            {!waBusy && waState !== 'ready' && (
+                                <div style={{ textAlign: 'center', paddingBottom: '16px' }}>
+                                    <button className="ac-btn danger" style={{ fontSize: '12px' }} onClick={handleResetWA}>
+                                        Reset &amp; Start Over
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
+
+                {/* ════ Telegram Connect Modal ════ */}
+                {tgModal && (
+                    <div
+                        onClick={() => setTgModal(false)}
+                        style={{
+                            position: 'fixed', inset: 0, zIndex: 1000,
+                            background: 'rgba(0,0,0,0.75)',
+                            backdropFilter: 'blur(12px)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            animation: 'tgFadeIn 0.2s ease',
+                        }}
+                    >
+                        <div
+                            onClick={e => e.stopPropagation()}
+                            style={{
+                                width: '100%', maxWidth: '420px',
+                                background: 'rgba(8, 14, 24, 0.96)',
+                                border: '1px solid rgba(0,136,204,0.25)',
+                                boxShadow: '0 0 60px rgba(0,136,204,0.12), 0 24px 48px rgba(0,0,0,0.6)',
+                                padding: '0',
+                                overflow: 'hidden',
+                                animation: 'tgSlideUp 0.28s cubic-bezier(0.16,1,0.3,1)',
+                                position: 'relative',
+                            }}
+                        >
+                            {/* Top accent bar */}
+                            <div style={{
+                                height: '3px',
+                                background: 'linear-gradient(90deg, #0088CC 0%, #00AAEE 50%, transparent 100%)',
+                            }} />
+
+                            {/* Close */}
+                            <button
+                                onClick={() => setTgModal(false)}
+                                style={{
+                                    position: 'absolute', top: '16px', right: '16px',
+                                    background: 'none', border: 'none', cursor: 'pointer',
+                                    color: 'rgba(255,255,255,0.3)', padding: '4px',
+                                    display: 'flex', transition: 'color 0.15s',
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+                                onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                            </button>
+
+                            {/* Header */}
+                            <div style={{ padding: '28px 28px 20px' }}>
+                                <div style={{
+                                    display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px',
+                                }}>
+                                    <div style={{
+                                        width: '38px', height: '38px',
+                                        background: 'rgba(0,136,204,0.15)',
+                                        border: '1px solid rgba(0,136,204,0.3)',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        flexShrink: 0,
+                                        boxShadow: '0 0 16px rgba(0,136,204,0.2)',
+                                    }}>
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0088CC" strokeWidth="1.8"><path d="M22 2L11 13" /><path d="M22 2L15 22l-4-9-9-4L22 2z" /></svg>
+                                    </div>
+                                    <div>
+                                        <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>Telegram Bot</div>
+                                        <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', marginTop: '1px' }}>Bring your own bot from @BotFather</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Divider */}
+                            <div style={{ height: '1px', background: 'rgba(255,255,255,0.05)', margin: '0 28px' }} />
+
+                            {/* Body */}
+                            <div style={{ padding: '20px 28px 24px' }}>
+                                {/* BotFather link */}
+                                <a
+                                    href="https://t.me/BotFather"
+                                    target="_blank" rel="noopener noreferrer"
+                                    style={{
+                                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                        padding: '10px 14px', marginBottom: '20px',
+                                        background: 'rgba(0,136,204,0.08)',
+                                        border: '1px solid rgba(0,136,204,0.2)',
+                                        color: '#0099DD', fontSize: '12px', fontWeight: 600,
+                                        textDecoration: 'none', letterSpacing: '0.02em',
+                                        transition: 'background 0.15s, border-color 0.15s',
+                                    }}
+                                    onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,136,204,0.15)'; e.currentTarget.style.borderColor = 'rgba(0,136,204,0.4)'; }}
+                                    onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,136,204,0.08)'; e.currentTarget.style.borderColor = 'rgba(0,136,204,0.2)'; }}
+                                >
+                                    <span>① Open @BotFather → /newbot → copy token</span>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+                                </a>
+
+                                {/* Token input */}
+                                <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '8px' }}>
+                                    BOT TOKEN
+                                </div>
+                                <input
+                                    type="text"
+                                    value={tgBotToken}
+                                    onChange={e => setTgBotToken(e.target.value)}
+                                    onKeyDown={e => e.key === 'Enter' && handleSaveTgChatId()}
+                                    placeholder="1234567890:ABCDEFghijklmnopqrstuvwxyz"
+                                    autoFocus
+                                    style={{
+                                        width: '100%', padding: '11px 14px',
+                                        background: 'rgba(255,255,255,0.04)',
+                                        border: `1px solid ${tgBotToken.trim() ? 'rgba(0,136,204,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                                        color: '#e0e0e0', fontSize: '13px',
+                                        fontFamily: 'monospace', outline: 'none',
+                                        boxSizing: 'border-box', marginBottom: '20px',
+                                        transition: 'border-color 0.2s, box-shadow 0.2s',
+                                        boxShadow: tgBotToken.trim() ? '0 0 0 1px rgba(0,136,204,0.15) inset' : 'none',
+                                        letterSpacing: '0.01em',
+                                    }}
+                                />
+
+                                {/* Connect button */}
+                                <button
+                                    onClick={handleSaveTgChatId}
+                                    disabled={!tgBotToken.trim() || tgSaving}
+                                    style={{
+                                        width: '100%', padding: '12px',
+                                        background: tgBotToken.trim()
+                                            ? 'linear-gradient(90deg, #0077BB 0%, #0099DD 100%)'
+                                            : 'rgba(255,255,255,0.06)',
+                                        border: 'none', cursor: tgBotToken.trim() ? 'pointer' : 'not-allowed',
+                                        color: tgBotToken.trim() ? '#fff' : 'rgba(255,255,255,0.25)',
+                                        fontSize: '13px', fontWeight: 700,
+                                        letterSpacing: '0.06em', textTransform: 'uppercase',
+                                        transition: 'all 0.2s',
+                                        boxShadow: tgBotToken.trim() ? '0 0 24px rgba(0,136,204,0.3)' : 'none',
+                                        fontFamily: 'inherit',
+                                        animation: tgBotToken.trim() ? 'tgPulseGlow 2.5s ease-in-out infinite' : 'none',
+                                    }}
+                                >
+                                    {tgSaving ? '⏳ Connecting…' : '⚡ Connect Bot'}
+                                </button>
+                            </div>
+
+                            {/* Inline keyframes via style tag */}
+                            <style>{`
+                                @keyframes tgFadeIn { from { opacity: 0 } to { opacity: 1 } }
+                                @keyframes tgSlideUp { from { opacity: 0; transform: translateY(20px) scale(0.97) } to { opacity: 1; transform: translateY(0) scale(1) } }
+                                @keyframes tgPulseGlow { 0%,100% { box-shadow: 0 0 24px rgba(0,136,204,0.3) } 50% { box-shadow: 0 0 36px rgba(0,136,204,0.55), 0 0 12px rgba(0,170,238,0.3) } }
+                            `}</style>
+                        </div>
+                    </div>
+                )}
+
+
             </div>
         </MainLayout>
     );

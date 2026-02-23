@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth, GoogleAuthProvider, GithubAuthProvider } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getAnalytics } from "firebase/analytics";
+import { getAnalytics, isSupported } from "firebase/analytics";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDNawcApLJ-aJxl6ap3Rrpz2wK_lnegKiY",
@@ -19,12 +19,12 @@ const db = getFirestore(app);
 const googleProvider = new GoogleAuthProvider();
 const githubProvider = new GithubAuthProvider();
 
-let analytics;
-try {
-    analytics = getAnalytics(app);
-} catch (e) {
-    // Analytics may fail in dev/SSR
-}
+let analytics = null;
+isSupported().then((supported) => {
+    if (supported) {
+        analytics = getAnalytics(app);
+    }
+}).catch(console.error);
 
 export { auth, db, googleProvider, githubProvider, analytics };
 export default app;

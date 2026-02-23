@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import MainLayout from '../../components/Layout/MainLayout';
 import './Inbox.css';
 import { io } from 'socket.io-client';
+import { useAuth } from '../../contexts/AuthContext';
 
 /* ── Cache ─────────────────────────────────────────────────────────────────── */
 const CACHE_KEY = 'flowsync_inbox_threads';
@@ -95,6 +96,7 @@ function generateAISuggestions(messages, name) {
 
 /* ── Component ──────────────────────────────────────────────────────────────── */
 const Inbox = () => {
+    const { userData } = useAuth();
     const [loaded, setLoaded] = useState(false);
     const [activePlatform, setActivePlatform] = useState('all');
     const [filter, setFilter] = useState('all');
@@ -110,8 +112,8 @@ const Inbox = () => {
     const [autoReply, setAutoReply] = useState({ instagram: false, twitter: false, whatsapp: true, telegram: false });
     const [searchQuery, setSearchQuery] = useState('');
 
-    /* ── WA connection tracking ─────────────────────────────────────────────── */
-    const [waReady, setWaReady] = useState(null); // null = unknown, true/false
+    /* ── WA connection tracking (linked=DB, ready=backend) ───────────────────── */
+    const [waReady, setWaReady] = useState(null); // null = unknown, true = ready, false = not ready
     const messagesBottomRef = useRef(null);
 
     /* ── Fetch state machine ────────────────────────────────────────────────── */
@@ -144,41 +146,81 @@ const Inbox = () => {
 
     useEffect(() => {
         requestAnimationFrame(() => setLoaded(true));
-
         const cached = loadCache();
         if (cached && cached.length > 0) {
             setThreads(cached);
             setFetchState('done');
             didFetchRef.current = true;
         }
+    }, []);
 
-        const socket = io('http://localhost:5000');
+    /* ── Socket: created only after userId is known ──────── */
+    useEffect(() => {
+        if (!userData?.uid) return;
+        if (socketRef.current?.connected) return;
+        if (socketRef.current) socketRef.current.disconnect();
+
+        const socket = io('http://localhost:5000', {
+            auth: { userId: userData.uid },   // ← required by server auth middleware
+            transports: ['websocket'],
+            reconnectionAttempts: 10,
+            reconnectionDelay: 1500,
+        });
         socketRef.current = socket;
 
-        /* ── On connect: ask WA status + fetch Telegram ── */
         socket.on('connect', () => {
-            console.log('[Inbox] Socket connected');
-            socket.emit('start_whatsapp');
-            // Always fetch Telegram messages (no auth needed)
+            console.log('[Inbox] Socket connected for user:', userData.uid.substring(0, 8));
+            setFetchState(prev => (prev === 'idle' || prev === 'not_connected') ? 'connecting' : prev);
             socket.emit('get_telegram_messages');
+            // If we have no WA threads, allow a fresh fetch on next wa_state:ready
+            setThreads(prev => {
+                const hasWAThreads = prev.some(t => t.platform === 'whatsapp');
+                if (!hasWAThreads) didFetchRef.current = false;
+                return prev;
+            });
         });
 
-        /* ── WA status: the key gatekeeper ── */
-        socket.on('whatsapp_status', (status) => {
-            console.log('[Inbox] WA status:', status);
-            const ready = status.ready;
-            setWaReady(ready);
+        socket.on('connect_error', (err) => {
+            console.error('[Inbox] Socket connect error:', err.message);
+            setFetchState(prev => (prev === 'loading' || prev === 'connecting') ? 'error' : prev);
+        });
 
-            if (!ready) {
-                // WA not connected — don't even try to fetch chats
-                if (threads.filter(t => t.platform === 'whatsapp').length === 0) {
-                    setFetchState('not_connected');
-                }
-                return;
+        /* ── wa_state is the single source of truth ── */
+        socket.on('wa_state', ({ state }) => {
+            if (state === 'ready') {
+                setWaReady(true);
+                // Fetch if we haven't yet, OR if we have no WA threads despite being ready
+                setThreads(prev => {
+                    const hasWAThreads = prev.some(t => t.platform === 'whatsapp');
+                    if (!didFetchRef.current || !hasWAThreads) {
+                        setFetchState('loading');
+                        setFetchProgress({ current: 0, total: 0, message: 'Fetching chats…' });
+                        socket.emit('get_whatsapp_chats');
+                        startFetchTimeout();
+                        didFetchRef.current = true;
+                    }
+                    return prev;
+                });
+            } else if (state === 'idle' || state === 'error') {
+                setWaReady(false);
+                setTimeout(() => {
+                    setFetchState(prev => {
+                        if (prev === 'loading' || prev === 'done') return prev;
+                        return 'not_connected';
+                    });
+                }, 2000);
+            } else {
+                // restoring / qr / authenticated — WA is in progress
+                setFetchState(prev =>
+                    (prev === 'idle' || prev === 'not_connected') ? 'connecting' : prev
+                );
             }
+        });
 
-            // WA is ready — fetch chats if we don't have fresh cache
-            if (!didFetchRef.current) {
+        /* ── Legacy whatsapp_status (belt-and-suspenders) ── */
+        socket.on('whatsapp_status', ({ ready }) => {
+            if (ready && !didFetchRef.current) {
+                setWaReady(true);
                 setFetchState('loading');
                 socket.emit('get_whatsapp_chats');
                 startFetchTimeout();
@@ -212,9 +254,9 @@ const Inbox = () => {
                 saveCache(merged);
                 return merged;
             });
-            if (fetchState === 'idle' || fetchState === 'not_connected') {
-                setFetchState('done');
-            }
+            setFetchState(prev =>
+                (prev === 'idle' || prev === 'connecting' || prev === 'not_connected') ? 'done' : prev
+            );
         });
 
         /* ── Real-time incoming WA message ── */
@@ -222,16 +264,54 @@ const Inbox = () => {
             setThreads(prev => {
                 const idx = prev.findIndex(t => t.id === msg.chatId);
                 if (idx > -1) {
-                    const next = [...prev];
-                    next[idx] = {
-                        ...next[idx],
-                        messages: [...next[idx].messages, { text: msg.text, time: msg.time, incoming: msg.incoming }],
-                        unread: msg.incoming ? true : next[idx].unread
+                    // Move thread to top + append message
+                    const updated = {
+                        ...prev[idx],
+                        messages: [...prev[idx].messages, { text: msg.text, time: msg.time, incoming: true }],
+                        unread: true,
                     };
+                    const next = [updated, ...prev.filter((_, i) => i !== idx)];
                     saveCache(next);
                     return next;
                 }
-                return prev;
+                // New conversation we haven't loaded yet — add a placeholder thread
+                const newThread = {
+                    id: msg.chatId, platform: 'whatsapp',
+                    name: msg.name || msg.from,
+                    avatar: (msg.name || msg.from || '?').substring(0, 2).toUpperCase(),
+                    intent: 'general', vip: false, tags: [], flagged: false, unread: true,
+                    messages: [{ text: msg.text, time: msg.time, incoming: true }],
+                };
+                const next = [newThread, ...prev];
+                saveCache(next);
+                return next;
+            });
+        });
+
+        /* ── Real-time incoming Telegram message ── */
+        socket.on('telegram_incoming_message', (msg) => {
+            setThreads(prev => {
+                const idx = prev.findIndex(t => t.id === msg.chatId);
+                if (idx > -1) {
+                    const updated = {
+                        ...prev[idx],
+                        messages: [...prev[idx].messages, { text: msg.text, time: msg.time, incoming: true }],
+                        unread: true,
+                    };
+                    const next = [updated, ...prev.filter((_, i) => i !== idx)];
+                    saveCache(next);
+                    return next;
+                }
+                const newThread = {
+                    id: msg.chatId, platform: 'telegram',
+                    telegramChatId: msg.telegramChatId,
+                    name: msg.name, avatar: msg.avatar || '?',
+                    intent: 'general', vip: false, tags: [], flagged: false, unread: true,
+                    messages: [{ text: msg.text, time: msg.time, incoming: true }],
+                };
+                const next = [newThread, ...prev];
+                saveCache(next);
+                return next;
             });
         });
 
@@ -276,21 +356,13 @@ const Inbox = () => {
             setWaReady(false);
         });
 
-        socket.on('connect_error', () => {
-            clearTimeout(fetchTimeoutRef.current);
-            setThreads(prev => {
-                if (prev.length === 0) setFetchState('error');
-                return prev;
-            });
-        });
-
         return () => {
             clearTimeout(fetchTimeoutRef.current);
             socket.disconnect();
             socketRef.current = null;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [userData?.uid]);
 
     /* ── Filter / search ────────────────────────────────────────────────────── */
     const filtered = useMemo(() => threads.filter(t => {
@@ -312,13 +384,16 @@ const Inbox = () => {
         sessionStorage.removeItem(CACHE_KEY);
         didFetchRef.current = false;
         setSendError('');
+        setFetchState('loading');
+        setFetchProgress({ current: 0, total: 0, message: 'Retrying…' });
         if (socketRef.current?.connected) {
-            socketRef.current.emit('start_whatsapp');
+            // Fetch chats directly if WA is ready, otherwise request status
+            if (waReady) {
+                socketRef.current.emit('get_whatsapp_chats');
+            }
             socketRef.current.emit('get_telegram_messages');
         }
-        setFetchState('loading');
-        setFetchProgress({ current: 0, total: 0, message: 'Retrying...' });
-    }, []);
+    }, [waReady]);
 
     /* ── Select thread → generate context-aware AI ─────────────────────────── */
     const selectThread = useCallback((id) => {
@@ -407,15 +482,24 @@ const Inbox = () => {
                             <button
                                 className={`ib-tab ${activePlatform === 'all' ? 'active' : ''}`}
                                 onClick={() => setActivePlatform('all')}
-                            >All</button>
+                                title="All platforms"
+                                style={{ '--tab-color': '#a0a0a0' }}
+                            >
+                                <span className="ib-tab-icon">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>
+                                </span>
+                                <span className="ib-tab-label">ALL</span>
+                            </button>
                             {Object.entries(platformMeta).map(([key, meta]) => (
                                 <button
                                     key={key}
                                     className={`ib-tab ${activePlatform === key ? 'active' : ''}`}
-                                    onClick={() => setActivePlatform(key)}
+                                    onClick={() => setActivePlatform(key === activePlatform ? 'all' : key)}
                                     title={meta.name}
+                                    style={{ '--tab-color': meta.color }}
                                 >
-                                    {meta.icon}
+                                    <span className="ib-tab-icon">{meta.icon}</span>
+                                    <span className="ib-tab-label">{meta.abbr}</span>
                                 </button>
                             ))}
                         </div>
@@ -441,16 +525,29 @@ const Inbox = () => {
                     </div>
 
                     <div className="ib-thread-list">
-                        {/* WhatsApp not connected notice */}
-                        {fetchState === 'not_connected' && threads.filter(t => t.platform === 'whatsapp').length === 0 && (
+                        {/* No platforms connected / Restoring session */}
+                        {fetchState === 'not_connected' && threads.length === 0 && (
                             <div className="ib-not-connected">
                                 <div className="ib-not-connected-icon">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                                         <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
                                     </svg>
                                 </div>
-                                <p>WhatsApp not connected</p>
-                                <span>Go to <strong>Accounts</strong> to connect your WhatsApp.</span>
+                                <p>No accounts connected</p>
+                                <span>Go to <strong>Accounts</strong> to connect your platforms to the Inbox.</span>
+                            </div>
+                        )}
+
+                        {/* Connecting / pre-fetch spinner */}
+                        {fetchState === 'connecting' && threads.length === 0 && (
+                            <div className="ib-progress-container">
+                                <div className="ib-progress-label">
+                                    <span>Connecting to WhatsApp…</span>
+                                </div>
+                                <div className="ib-progress-track">
+                                    <div className="ib-progress-bar" style={{ width: '30%', animation: 'ib-pulse 1.4s ease-in-out infinite' }} />
+                                </div>
+                                <p className="ib-progress-sub">Waiting for session to restore…</p>
                             </div>
                         )}
 
@@ -498,10 +595,10 @@ const Inbox = () => {
                         )}
 
                         {/* Thread list */}
-                        {(fetchState !== 'loading' || threads.length > 0) ? (
+                        {(['done', 'error', 'not_connected'].includes(fetchState) || threads.length > 0) ? (
                             filtered.length === 0 ? (
                                 <div className="ib-empty-list">
-                                    <p>{fetchState === 'done' ? 'No conversations found' : ''}</p>
+                                    <p>{fetchState === 'done' && activePlatform !== 'all' ? `No ${activePlatform} conversations` : fetchState === 'done' ? 'No conversations found' : ''}</p>
                                 </div>
                             ) : (
                                 filtered.map(t => {

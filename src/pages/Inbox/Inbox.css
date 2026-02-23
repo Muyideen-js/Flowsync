@@ -78,42 +78,67 @@
 .ib-platform-tabs {
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
+    padding: 2px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .ib-tab {
     display: flex;
     align-items: center;
-    justify-content: center;
-    padding: 6px 12px;
-    border-radius: 8px;
+    gap: 5px;
+    padding: 6px 11px;
+    border-radius: 9px;
     background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    color: rgba(255, 255, 255, 0.4);
-    font-size: 12px;
-    font-weight: 600;
+    border: 1px solid transparent;
+    color: rgba(255, 255, 255, 0.35);
+    font-size: 11px;
+    font-weight: 700;
     font-family: inherit;
     cursor: pointer;
-    transition: all 0.17s ease;
+    transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
     flex-shrink: 0;
+    letter-spacing: 0.02em;
 }
 
-.ib-tab svg {
-    width: 14px;
-    height: 14px;
+.ib-tab-icon {
+    display: flex;
+    align-items: center;
+}
+
+.ib-tab-icon svg {
+    width: 13px;
+    height: 13px;
     stroke-width: 2;
+    transition: color 0.2s;
+}
+
+.ib-tab-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    opacity: 0.8;
 }
 
 .ib-tab:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.75);
-    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.7);
+    transform: scale(1.04);
 }
 
 .ib-tab.active {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.18);
-    color: #fff;
+    background: rgba(var(--tab-r, 255), var(--tab-g, 255), var(--tab-b, 255), 0.12);
+    border-color: rgba(255, 255, 255, 0.1);
+    color: var(--tab-color, #fff);
+    box-shadow: 0 0 10px -2px color-mix(in srgb, var(--tab-color, #fff) 30%, transparent);
+    transform: scale(1.04);
+}
+
+.ib-tab.active .ib-tab-icon svg {
+    color: var(--tab-color, #fff);
+    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--tab-color, #fff) 60%, transparent));
 }
 
 /* ── Search & Filter ─────────────────────────────────────── */
@@ -189,12 +214,39 @@
 }
 
 .ib-thread-list::-webkit-scrollbar {
-    width: 3px;
+    width: 5px;
+}
+
+.ib-thread-list::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 100px;
 }
 
 .ib-thread-list::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.06);
-    border-radius: 4px;
+    background: linear-gradient(180deg, rgba(0, 201, 58, 0.5), rgba(0, 136, 204, 0.4));
+    border-radius: 100px;
+    box-shadow: 0 0 6px rgba(0, 201, 58, 0.25);
+    transition: background 0.2s;
+}
+
+.ib-thread-list::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, rgba(0, 201, 58, 0.85), rgba(0, 136, 204, 0.7));
+    box-shadow: 0 0 10px rgba(0, 201, 58, 0.5);
+}
+
+/* Also add a pulsing animation for the connecting bar */
+@keyframes ib-pulse {
+
+    0%,
+    100% {
+        opacity: 0.5;
+        transform: scaleX(0.97);
+    }
+
+    50% {
+        opacity: 1;
+        transform: scaleX(1);
+    }
 }
 
 /* ── Progress ────────────────────────────────────────────── */
