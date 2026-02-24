@@ -1,117 +1,112 @@
-/* ────────────────────────────────────────────────────────────
-   COMPOSER — Full Studio Redesign
-   No linear-gradient. Uses rgba() / color-mix() only.
-──────────────────────────────────────────────────────────── */
+/* ═══════════════════════════════════════════
+   COMPOSER — flat, dark, no gradients, no glows
+   ═══════════════════════════════════════════ */
 
-/* ── Entrance animation ───────────────────────────────── */
-.anim-c {
+.cs-root {
+    display: flex;
+    gap: 0;
+    height: calc(100vh - var(--topbar-height));
+    margin: calc(var(--space-xl) * -1);
+    overflow: hidden;
     opacity: 0;
-    transform: translateY(14px);
-    transition:
-        opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
-        transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
-    transition-delay: calc(var(--i, 0) * 0.07s);
+    transition: opacity 0.3s ease;
 }
 
-.cs-root.loaded .anim-c {
+.cs-root.loaded {
+    opacity: 1;
+}
+
+/* ── Entrance animation ─────────────────────── */
+
+.cs-anim {
+    opacity: 0;
+    transform: translateY(6px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    transition-delay: calc(var(--i, 0) * 0.05s);
+}
+
+.cs-root.loaded .cs-anim {
     opacity: 1;
     transform: translateY(0);
 }
 
-/* ── Root layout ────────────────────────────────────────── */
-.cs-root {
-    display: flex;
-    gap: 0;
-    height: 100%;
-    min-height: 0;
-    overflow: hidden;
-    position: relative;
-}
+/* ══ WORKSPACE (left) ═══════════════════════ */
 
-/* ══════════════════════════════════════════════════════════
-   WORKSPACE (left column)
-══════════════════════════════════════════════════════════ */
 .cs-workspace {
     flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
-    min-height: 0;
-    min-width: 0;
-    border-right: 1px solid rgba(255, 255, 255, 0.06);
+    border-right: 1px solid rgba(255, 255, 255, 0.05);
+    background: #08090d;
 }
 
-/* ── Top bar ──────────────────────────────────────────── */
+/* ── Top bar ──────────────────────────────── */
+
 .cs-topbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 0 20px;
+    height: 48px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     flex-shrink: 0;
-    gap: 12px;
-    flex-wrap: wrap;
 }
 
-/* Tab switcher */
 .cs-tabs {
     display: flex;
-    gap: 4px;
-    background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 10px;
-    padding: 3px;
+    gap: 2px;
 }
 
 .cs-tab {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 7px 16px;
-    border-radius: 7px;
-    border: none;
-    background: transparent;
-    color: rgba(255, 255, 255, 0.4);
-    font-size: 13px;
+    gap: 7px;
+    padding: 6px 14px;
+    font-size: 12.5px;
     font-weight: 600;
-    font-family: inherit;
+    background: none;
+    border: 1px solid transparent;
+    color: rgba(255, 255, 255, 0.35);
     cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.cs-tab svg {
-    opacity: 0.6;
-    flex-shrink: 0;
+    font-family: inherit;
+    transition: all 0.15s;
+    letter-spacing: -0.01em;
 }
 
 .cs-tab:hover {
     color: rgba(255, 255, 255, 0.7);
-    background: rgba(255, 255, 255, 0.05);
 }
 
 .cs-tab.active {
-    background: rgba(255, 255, 255, 0.1);
     color: #fff;
+    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.04);
 }
 
 .cs-tab-ai.active {
-    background: rgba(138, 43, 226, 0.18);
-    color: #c9a0ff;
-    border: 1px solid rgba(138, 43, 226, 0.2);
+    color: #00c93a;
+    border-color: rgba(0, 201, 58, 0.18);
+    background: rgba(0, 201, 58, 0.06);
 }
 
-.cs-tab-ai.active svg {
+.cs-tab-ic {
+    display: flex;
+    opacity: 0.7;
+}
+
+.cs-tab.active .cs-tab-ic {
     opacity: 1;
-    stroke: #c9a0ff;
 }
 
-/* Right side of topbar */
 .cs-topbar-right {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 }
 
-/* Brand voice toggle */
+/* ── Brand toggle ──────────────────────────── */
+
 .cs-brand-toggle {
     display: flex;
     align-items: center;
@@ -125,216 +120,181 @@
 }
 
 .cs-brand-track {
-    width: 30px;
-    height: 17px;
-    border-radius: 100px;
+    width: 28px;
+    height: 15px;
     background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     position: relative;
-    transition: background 0.25s ease;
+    transition: background 0.2s, border-color 0.2s;
     flex-shrink: 0;
 }
 
 .cs-brand-track::after {
     content: '';
     position: absolute;
-    top: 2.5px;
-    left: 2.5px;
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.35);
-    transition: transform 0.25s ease, background 0.25s ease;
+    top: 2px;
+    left: 2px;
+    width: 9px;
+    height: 9px;
+    background: rgba(255, 255, 255, 0.4);
+    transition: transform 0.2s, background 0.2s;
 }
 
 .cs-brand-toggle input:checked+.cs-brand-track {
-    background: rgba(138, 43, 226, 0.4);
+    background: rgba(0, 201, 58, 0.15);
+    border-color: rgba(0, 201, 58, 0.3);
 }
 
 .cs-brand-toggle input:checked+.cs-brand-track::after {
     transform: translateX(13px);
-    background: #c9a0ff;
+    background: #00c93a;
 }
 
 .cs-brand-text {
     display: flex;
     align-items: center;
     gap: 5px;
-    font-size: 12.5px;
+    font-size: 12px;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.45);
-    transition: color 0.2s ease;
+    color: rgba(255, 255, 255, 0.4);
+    transition: color 0.15s;
 }
 
-.cs-brand-toggle:has(input:checked) .cs-brand-text {
-    color: #c9a0ff;
+.cs-brand-toggle:hover .cs-brand-text {
+    color: rgba(255, 255, 255, 0.7);
 }
 
-.cs-brand-text svg {
-    stroke: currentColor;
-}
-
-/* Preview button */
 .cs-preview-btn {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 7px 14px;
-    border-radius: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    background: rgba(255, 255, 255, 0.04);
-    color: rgba(255, 255, 255, 0.45);
-    font-size: 12.5px;
+    padding: 5px 11px;
+    font-size: 12px;
     font-weight: 600;
-    font-family: inherit;
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.4);
     cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.cs-preview-btn svg {
-    stroke: currentColor;
+    font-family: inherit;
+    transition: all 0.15s;
 }
 
 .cs-preview-btn:hover,
 .cs-preview-btn.active {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.15);
-    color: #fff;
+    border-color: rgba(255, 255, 255, 0.18);
+    color: rgba(255, 255, 255, 0.85);
 }
 
-/* ── Channel / Type bar ───────────────────────────────── */
+/* ── Channel bar ──────────────────────────── */
+
 .cs-channel-bar {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 12px 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 10px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     flex-shrink: 0;
     flex-wrap: wrap;
 }
 
 .cs-label {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
-    color: rgba(255, 255, 255, 0.25);
     text-transform: uppercase;
-    letter-spacing: 0.07em;
-    white-space: nowrap;
-    flex-shrink: 0;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.2);
 }
 
 .cs-label-gap {
-    margin-left: 6px;
+    margin-left: 8px;
 }
 
-.cs-channels {
-    display: flex;
-    gap: 6px;
-}
-
-.cs-ch {
-    position: relative;
-    padding: 5px 14px;
-    border-radius: 100px;
-    border: 1.5px solid rgba(255, 255, 255, 0.07);
-    background: rgba(255, 255, 255, 0.03);
-    color: rgba(255, 255, 255, 0.4);
-    font-size: 11.5px;
-    font-weight: 700;
-    font-family: inherit;
-    cursor: pointer;
-    transition: all 0.18s ease;
-    letter-spacing: 0.02em;
-}
-
-.cs-ch:hover {
-    border-color: rgba(255, 255, 255, 0.14);
-    color: rgba(255, 255, 255, 0.7);
-}
-
-.cs-ch.active {
-    background: color-mix(in srgb, var(--ch) 12%, transparent);
-    border-color: color-mix(in srgb, var(--ch) 40%, transparent);
-    color: var(--ch);
-}
-
-.cs-ch-dot {
-    display: inline-block;
-    width: 5px;
-    height: 5px;
-    border-radius: 50%;
-    background: var(--ch);
-    margin-left: 5px;
-    vertical-align: middle;
-}
-
+.cs-channels,
 .cs-types {
     display: flex;
-    gap: 4px;
+    gap: 5px;
     flex-wrap: wrap;
 }
 
-.cs-type {
-    padding: 4px 12px;
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    background: transparent;
-    color: rgba(255, 255, 255, 0.35);
-    font-size: 11.5px;
-    font-weight: 500;
-    font-family: inherit;
+.cs-ch {
+    font-size: 10px;
+    font-weight: 800;
+    padding: 4px 10px;
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.3);
     cursor: pointer;
-    transition: all 0.15s ease;
+    font-family: inherit;
+    letter-spacing: 0.04em;
+    transition: all 0.15s;
 }
 
-.cs-type:hover {
-    background: rgba(255, 255, 255, 0.05);
+.cs-ch.active {
+    color: var(--ch);
+    border-color: color-mix(in srgb, var(--ch) 35%, transparent);
+    background: color-mix(in srgb, var(--ch) 8%, transparent);
+}
+
+.cs-ch:hover:not(.active) {
+    border-color: rgba(255, 255, 255, 0.18);
     color: rgba(255, 255, 255, 0.6);
 }
 
-.cs-type.active {
-    background: rgba(255, 255, 255, 0.09);
-    border-color: rgba(255, 255, 255, 0.15);
-    color: #fff;
-    font-weight: 600;
+.cs-type {
+    font-size: 11.5px;
+    font-weight: 500;
+    padding: 4px 11px;
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
 }
 
-/* ══════════════════════════════════════════════════════════
-   WRITE PANEL
-══════════════════════════════════════════════════════════ */
+.cs-type.active {
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.cs-type:hover:not(.active) {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* ── Write panel ──────────────────────────── */
+
 .cs-write-panel {
     flex: 1;
     display: flex;
     flex-direction: column;
-    min-height: 0;
+    overflow: hidden;
 }
 
-/* Editor wrap */
 .cs-editor-wrap {
     flex: 1;
     position: relative;
-    min-height: 0;
+    overflow: hidden;
 }
 
 .cs-editor {
     width: 100%;
     height: 100%;
-    min-height: 280px;
-    padding: 22px 24px;
     background: transparent;
     border: none;
     outline: none;
     resize: none;
+    font-size: 14px;
+    font-weight: 400;
+    color: rgba(255, 255, 255, 0.75);
     font-family: inherit;
-    font-size: 15px;
+    padding: 22px 24px;
     line-height: 1.7;
-    color: rgba(255, 255, 255, 0.9);
-    caret-color: #00c93a;
-    box-sizing: border-box;
+    letter-spacing: -0.01em;
 }
 
 .cs-editor::placeholder {
-    color: rgba(255, 255, 255, 0.18);
-    line-height: 1.7;
+    color: rgba(255, 255, 255, 0.15);
 }
 
 .cs-brand-badge {
@@ -343,219 +303,190 @@
     right: 14px;
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 6px;
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #00c93a;
+    background: rgba(0, 201, 58, 0.08);
+    border: 1px solid rgba(0, 201, 58, 0.18);
     padding: 4px 10px;
-    border-radius: 100px;
-    background: rgba(138, 43, 226, 0.12);
-    border: 1px solid rgba(138, 43, 226, 0.2);
-    color: rgba(183, 138, 255, 0.8);
-    font-size: 11px;
-    font-weight: 600;
-    pointer-events: none;
 }
 
-.cs-brand-badge svg {
-    stroke: currentColor;
-    width: 12px;
-    height: 12px;
-}
+/* ── Toolbar ──────────────────────────────── */
 
-/* ── Toolbar ────────────────────────────────────────────── */
 .cs-toolbar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 16px;
-    border-top: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 10px 18px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
     flex-shrink: 0;
-    gap: 12px;
-    flex-wrap: wrap;
+    gap: 10px;
 }
 
-.cs-tools-left {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.cs-tool {
-    width: 34px;
-    height: 34px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 8px;
-    border: none;
-    background: transparent;
-    color: rgba(255, 255, 255, 0.35);
-    cursor: pointer;
-    transition: all 0.15s ease;
-}
-
-.cs-tool:hover {
-    background: rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.65);
-}
-
-.cs-char-count {
-    margin-left: 8px;
-    font-size: 12px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.3);
-    font-feature-settings: 'tnum';
-}
-
-.cs-char-count.over {
-    color: #ff6b6b;
-}
-
-.cs-char-max {
-    font-weight: 400;
-    color: rgba(255, 255, 255, 0.2);
-}
-
+.cs-tools-left,
 .cs-tools-right {
     display: flex;
     align-items: center;
     gap: 6px;
 }
 
-.cs-action-btn {
+.cs-tool {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.35);
+    cursor: pointer;
+    transition: all 0.15s;
+}
+
+.cs-tool:hover {
+    color: rgba(255, 255, 255, 0.7);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.cs-char-count {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.25);
+    font-feature-settings: 'tnum';
+    margin-left: 4px;
+}
+
+.cs-char-count.over {
+    color: #ef4444;
+}
+
+.cs-char-max {
+    opacity: 0.5;
+}
+
+.cs-btn {
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 8px 16px;
-    border-radius: 8px;
-    font-size: 13px;
+    padding: 7px 14px;
+    font-size: 12.5px;
     font-weight: 600;
     font-family: inherit;
     cursor: pointer;
-    transition: all 0.18s ease;
+    transition: all 0.15s;
+    border: 1px solid transparent;
 }
 
-.cs-action-btn svg {
-    flex-shrink: 0;
+.cs-btn.secondary {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.45);
 }
 
-.cs-action-btn.secondary {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.09);
-    color: rgba(255, 255, 255, 0.5);
+.cs-btn.secondary:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.85);
 }
 
-.cs-action-btn.secondary:hover {
-    background: rgba(255, 255, 255, 0.09);
-    color: rgba(255, 255, 255, 0.8);
-}
-
-.cs-action-btn.primary {
+.cs-btn.primary {
     background: #00c93a;
-    border: none;
+    border-color: #00c93a;
     color: #000;
+    font-weight: 700;
 }
 
-.cs-action-btn.primary:hover:not(:disabled) {
-    filter: brightness(1.1);
+.cs-btn.primary:hover {
+    background: #00b535;
 }
 
-.cs-action-btn.primary:disabled {
+.cs-btn.primary:disabled {
     opacity: 0.35;
     cursor: not-allowed;
 }
 
-/* ══════════════════════════════════════════════════════════
-   AI STUDIO PANEL
-══════════════════════════════════════════════════════════ */
+/* ══ AI STUDIO ════════════════════════════ */
+
 .cs-ai-panel {
     flex: 1;
     display: flex;
     flex-direction: column;
     overflow-y: auto;
-    padding: 20px;
-    gap: 20px;
+    scrollbar-width: none;
 }
 
 .cs-ai-panel::-webkit-scrollbar {
-    width: 4px;
-}
-
-.cs-ai-panel::-webkit-scrollbar-thumb {
-    background: rgba(138, 43, 226, 0.15);
-    border-radius: 4px;
+    display: none;
 }
 
 .cs-ai-controls {
-    background: rgba(138, 43, 226, 0.05);
-    border: 1px solid rgba(138, 43, 226, 0.1);
-    border-radius: 14px;
-    padding: 18px;
+    padding: 20px 24px;
     display: flex;
     flex-direction: column;
     gap: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .cs-ai-row {
-    display: flex;
-    gap: 20px;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
 }
 
 .cs-ai-group {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    flex: 1;
-    min-width: 200px;
 }
 
 .cs-ai-group label {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
-    color: rgba(183, 138, 255, 0.6);
     text-transform: uppercase;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.25);
 }
 
 .cs-pills {
     display: flex;
-    gap: 5px;
     flex-wrap: wrap;
+    gap: 5px;
 }
 
 .cs-pill {
-    padding: 5px 12px;
-    border-radius: 100px;
-    border: 1px solid rgba(138, 43, 226, 0.15);
-    background: rgba(138, 43, 226, 0.06);
-    color: rgba(183, 138, 255, 0.55);
-    font-size: 12px;
-    font-weight: 600;
-    font-family: inherit;
+    font-size: 11.5px;
+    font-weight: 500;
+    padding: 4px 11px;
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.35);
     cursor: pointer;
-    transition: all 0.15s ease;
+    font-family: inherit;
+    transition: all 0.15s;
 }
 
 .cs-pill:hover {
-    background: rgba(138, 43, 226, 0.12);
-    color: rgba(183, 138, 255, 0.8);
+    color: rgba(255, 255, 255, 0.65);
+    border-color: rgba(255, 255, 255, 0.14);
 }
 
 .cs-pill.active {
-    background: rgba(138, 43, 226, 0.22);
-    border-color: rgba(138, 43, 226, 0.35);
-    color: #c9a0ff;
+    color: #00c93a;
+    border-color: rgba(0, 201, 58, 0.25);
+    background: rgba(0, 201, 58, 0.08);
 }
 
 .cs-ai-input {
-    padding: 9px 13px;
-    border-radius: 8px;
-    border: 1px solid rgba(138, 43, 226, 0.14);
-    background: rgba(0, 0, 0, 0.25);
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 13px;
-    font-family: inherit;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
     outline: none;
-    transition: border-color 0.2s ease;
+    padding: 8px 12px;
+    font-size: 12.5px;
+    color: rgba(255, 255, 255, 0.7);
+    font-family: inherit;
+    transition: border-color 0.15s;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .cs-ai-input::placeholder {
@@ -563,151 +494,122 @@
 }
 
 .cs-ai-input:focus {
-    border-color: rgba(138, 43, 226, 0.3);
+    border-color: rgba(255, 255, 255, 0.18);
 }
 
 .cs-brand-note {
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: 8px;
     padding: 9px 14px;
-    border-radius: 8px;
-    background: rgba(138, 43, 226, 0.08);
-    border: 1px solid rgba(138, 43, 226, 0.15);
+    background: rgba(0, 201, 58, 0.05);
+    border: 1px solid rgba(0, 201, 58, 0.15);
     font-size: 12px;
-    color: rgba(183, 138, 255, 0.7);
+    color: rgba(0, 201, 58, 0.8);
 }
 
-.cs-brand-note svg {
-    stroke: currentColor;
-    flex-shrink: 0;
-}
-
-.cs-brand-note strong {
-    color: #c9a0ff;
-}
-
-/* Generate button */
 .cs-generate-btn {
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 8px;
-    width: 100%;
-    padding: 12px;
-    border-radius: 10px;
-    border: 1px solid rgba(138, 43, 226, 0.3);
-    background: rgba(138, 43, 226, 0.14);
-    color: #c9a0ff;
-    font-size: 14px;
+    padding: 10px 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 13px;
     font-weight: 700;
     font-family: inherit;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.15s;
+    letter-spacing: 0.01em;
 }
 
 .cs-generate-btn:hover:not(:disabled) {
-    background: rgba(138, 43, 226, 0.22);
-    border-color: rgba(138, 43, 226, 0.45);
+    background: rgba(0, 201, 58, 0.1);
+    border-color: rgba(0, 201, 58, 0.25);
+    color: #00c93a;
 }
 
 .cs-generate-btn:disabled {
-    opacity: 0.5;
+    opacity: 0.45;
     cursor: not-allowed;
 }
 
-.cs-generate-btn svg {
-    stroke: currentColor;
-}
-
-/* Spinner */
 .cs-spinner {
-    width: 16px;
-    height: 16px;
-    border: 2px solid rgba(183, 138, 255, 0.2);
-    border-top-color: #c9a0ff;
+    width: 12px;
+    height: 12px;
+    border: 1.5px solid rgba(255, 255, 255, 0.2);
+    border-top-color: rgba(255, 255, 255, 0.75);
     border-radius: 50%;
-    animation: cs-spin 0.8s linear infinite;
-    flex-shrink: 0;
+    animation: spin 0.7s linear infinite;
 }
 
-@keyframes cs-spin {
+@keyframes spin {
     to {
         transform: rotate(360deg);
     }
 }
 
-/* ── Variations ─────────────────────────────────────────── */
+/* ── Variations ───────────────────────────── */
+
 .cs-variations {
+    padding: 20px 24px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
 }
 
 .cs-var-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-}
-
-.cs-var-header span {
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 700;
-    color: rgba(255, 255, 255, 0.3);
     text-transform: uppercase;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.25);
 }
 
 .cs-regen {
     display: flex;
     align-items: center;
     gap: 5px;
-    padding: 5px 12px;
-    border-radius: 7px;
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(255, 255, 255, 0.03);
-    color: rgba(255, 255, 255, 0.4);
-    font-size: 11.5px;
+    font-size: 11px;
     font-weight: 600;
-    font-family: inherit;
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.4);
+    padding: 4px 10px;
     cursor: pointer;
-    transition: all 0.15s ease;
+    font-family: inherit;
+    transition: all 0.15s;
 }
 
 .cs-regen:hover {
-    background: rgba(255, 255, 255, 0.07);
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.8);
+    border-color: rgba(255, 255, 255, 0.18);
 }
 
-.cs-regen svg {
-    stroke: currentColor;
-}
-
-/* Var grid: 3 cards side by side on wide screens, stacked on narrow */
 .cs-var-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .cs-var-card {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 12px;
-    padding: 14px;
+    background: #08090d;
+    padding: 16px 18px;
     display: flex;
     flex-direction: column;
     gap: 10px;
-    transition: border-color 0.2s ease, background 0.2s ease;
-}
-
-.cs-var-card:hover {
-    border-color: rgba(255, 255, 255, 0.12);
+    transition: background 0.15s;
 }
 
 .cs-var-card.selected {
-    border-color: rgba(0, 201, 58, 0.3);
-    background: rgba(0, 201, 58, 0.04);
+    border-left: 2px solid #00c93a;
 }
 
 .cs-var-top {
@@ -717,80 +619,76 @@
 }
 
 .cs-var-label {
-    font-size: 11.5px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.4);
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.45);
     text-transform: capitalize;
 }
 
 .cs-var-score {
     font-size: 11px;
-    font-weight: 700;
-    padding: 2px 9px;
-    border-radius: 100px;
-    background: rgba(0, 201, 58, 0.1);
-    border: 1px solid rgba(0, 201, 58, 0.2);
+    font-weight: 800;
     color: #00c93a;
+    background: rgba(0, 201, 58, 0.08);
+    padding: 2px 8px;
 }
 
 .cs-var-text {
+    font-size: 12.5px;
+    color: rgba(255, 255, 255, 0.5);
+    line-height: 1.55;
     margin: 0;
-    font-size: 12.5px;
-    color: rgba(255, 255, 255, 0.55);
-    line-height: 1.6;
-    flex: 1;
-    display: -webkit-box;
-    -webkit-line-clamp: 6;
-    line-clamp: 6;
-    -webkit-box-orient: vertical;
+    white-space: pre-wrap;
+    max-height: 120px;
     overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 5;
+    -webkit-box-orient: vertical;
 }
 
-.cs-var-edit textarea {
-    width: 100%;
-    background: rgba(0, 0, 0, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    padding: 10px;
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 12.5px;
-    font-family: inherit;
-    outline: none;
-    resize: vertical;
-    box-sizing: border-box;
-}
-
-.cs-var-edit-actions {
+.cs-var-edit {
     display: flex;
-    gap: 6px;
-    margin-top: 6px;
+    flex-direction: column;
+    gap: 8px;
 }
 
+.cs-var-textarea {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    outline: none;
+    padding: 10px 12px;
+    font-size: 12.5px;
+    color: rgba(255, 255, 255, 0.75);
+    font-family: inherit;
+    resize: vertical;
+    line-height: 1.55;
+    white-space: pre-wrap;
+}
+
+.cs-var-edit-actions,
 .cs-var-actions {
     display: flex;
     gap: 5px;
-    flex-wrap: wrap;
 }
 
 .cs-var-act {
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 5px 10px;
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    background: rgba(255, 255, 255, 0.03);
-    color: rgba(255, 255, 255, 0.42);
-    font-size: 11.5px;
+    gap: 5px;
+    font-size: 11px;
     font-weight: 600;
-    font-family: inherit;
+    padding: 5px 11px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.4);
     cursor: pointer;
-    transition: all 0.15s ease;
+    font-family: inherit;
+    transition: all 0.15s;
 }
 
 .cs-var-act:hover {
-    background: rgba(255, 255, 255, 0.07);
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.8);
+    border-color: rgba(255, 255, 255, 0.18);
 }
 
 .cs-var-act.use {
@@ -803,86 +701,70 @@
     background: rgba(0, 201, 58, 0.14);
 }
 
-.cs-var-act svg {
-    stroke: currentColor;
-}
+/* ══ PREVIEW PANEL (right) ═══════════════ */
 
-/* ══════════════════════════════════════════════════════════
-   PREVIEW PANEL (right column, slides in)
-══════════════════════════════════════════════════════════ */
 .cs-preview-panel {
     width: 320px;
     flex-shrink: 0;
+    border-left: 1px solid rgba(255, 255, 255, 0.05);
+    background: #06070b;
     display: flex;
     flex-direction: column;
-    border-left: 1px solid rgba(255, 255, 255, 0.06);
-    background: rgba(8, 8, 18, 0.5);
-    min-height: 0;
 }
 
 .cs-prev-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 14px 16px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 0 18px;
+    height: 48px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     flex-shrink: 0;
 }
 
 .cs-prev-header h3 {
-    margin: 0;
-    font-size: 13.5px;
+    font-size: 11px;
     font-weight: 700;
-    color: rgba(255, 255, 255, 0.6);
-    letter-spacing: -0.01em;
+    color: rgba(255, 255, 255, 0.35);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin: 0;
 }
 
 .cs-prev-close {
-    width: 28px;
-    height: 28px;
+    width: 26px;
+    height: 26px;
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 7px;
-    border: none;
-    background: rgba(255, 255, 255, 0.05);
-    color: rgba(255, 255, 255, 0.4);
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.35);
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all 0.15s;
 }
 
 .cs-prev-close:hover {
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
-}
-
-.cs-prev-close svg {
-    stroke: currentColor;
+    color: rgba(255, 255, 255, 0.8);
+    border-color: rgba(255, 255, 255, 0.18);
 }
 
 .cs-prev-scroll {
     flex: 1;
     overflow-y: auto;
-    padding: 14px;
+    padding: 16px;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 14px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
 }
 
-.cs-prev-scroll::-webkit-scrollbar {
-    width: 3px;
-}
+/* ── Preview card ──────────────────────────── */
 
-.cs-prev-scroll::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.07);
-    border-radius: 4px;
-}
-
-/* Preview card */
 .cs-prev-card {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid color-mix(in srgb, var(--ch) 20%, transparent);
-    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.07);
     padding: 14px;
     display: flex;
     flex-direction: column;
@@ -896,208 +778,191 @@
 }
 
 .cs-prev-avatar {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 800;
-    color: #fff;
+    color: rgba(255, 255, 255, 0.5);
     flex-shrink: 0;
 }
 
 .cs-prev-info {
     flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
     gap: 1px;
 }
 
 .cs-prev-name {
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 700;
     color: rgba(255, 255, 255, 0.8);
 }
 
 .cs-prev-handle {
     font-size: 11px;
-    color: rgba(255, 255, 255, 0.28);
+    color: rgba(255, 255, 255, 0.3);
 }
 
-.cs-prev-badge {
-    padding: 2px 8px;
-    border-radius: 100px;
-    font-size: 10px;
-    font-weight: 700;
-    color: #fff;
-    opacity: 0.85;
-    flex-shrink: 0;
+.cs-prev-ch-label {
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    padding: 3px 7px;
+    color: var(--ch);
+    background: color-mix(in srgb, var(--ch) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ch) 20%, transparent);
 }
 
 .cs-prev-content {
-    margin: 0;
     font-size: 12.5px;
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(255, 255, 255, 0.55);
     line-height: 1.6;
+    margin: 0;
     white-space: pre-wrap;
     word-break: break-word;
 }
 
 .cs-prev-meta {
     display: flex;
-    align-items: center;
     gap: 6px;
-    font-size: 11px;
+    font-size: 10.5px;
     color: rgba(255, 255, 255, 0.2);
 }
 
-.cs-prev-reactions {
+.cs-prev-stats {
     display: flex;
     gap: 12px;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.28);
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.04);
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.25);
+    font-weight: 600;
 }
 
-/* ── Score card ─────────────────────────────────────────── */
+/* ── Score card ────────────────────────────── */
+
 .cs-score-card {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    background: rgba(0, 201, 58, 0.04);
-    border: 1px solid rgba(0, 201, 58, 0.1);
-    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     padding: 14px;
-}
-
-.cs-score-ring-wrap {
-    position: relative;
-    width: 60px;
-    height: 60px;
-    flex-shrink: 0;
-}
-
-.cs-score-svg {
-    width: 60px;
-    height: 60px;
-    transform: rotate(-90deg);
-}
-
-.cs-score-center {
-    position: absolute;
-    inset: 0;
     display: flex;
     flex-direction: column;
+    gap: 10px;
+}
+
+.cs-score-row {
+    display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: space-between;
+}
+
+.cs-score-heading {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.25);
 }
 
 .cs-score-num {
-    font-size: 16px;
+    font-size: 12px;
     font-weight: 800;
-    color: #00c93a;
-    line-height: 1;
+    color: rgba(255, 255, 255, 0.65);
 }
 
-.cs-score-label {
-    font-size: 9px;
-    font-weight: 600;
-    color: rgba(0, 201, 58, 0.55);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
+.cs-score-track {
+    height: 3px;
+    background: rgba(255, 255, 255, 0.06);
+    overflow: hidden;
+}
+
+.cs-score-fill {
+    height: 100%;
+    transition: width 0.6s ease, background 0.3s;
 }
 
 .cs-score-items {
     display: flex;
     flex-direction: column;
-    gap: 5px;
-    flex: 1;
+    gap: 6px;
 }
 
 .cs-score-item {
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: 8px;
     font-size: 11.5px;
     color: rgba(255, 255, 255, 0.45);
 }
 
 .cs-score-dot {
-    width: 7px;
-    height: 7px;
+    width: 5px;
+    height: 5px;
     border-radius: 50%;
     flex-shrink: 0;
 }
 
-/* ── Tips card ──────────────────────────────────────────── */
+/* ── Tips ──────────────────────────────────── */
+
 .cs-tips {
     background: rgba(255, 255, 255, 0.02);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
     padding: 14px;
 }
 
 .cs-tips h4 {
-    margin: 0 0 10px;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
-    color: rgba(255, 255, 255, 0.25);
     text-transform: uppercase;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.25);
+    margin: 0 0 10px;
 }
 
 .cs-tips ul {
     margin: 0;
-    padding: 0;
-    list-style: none;
+    padding-left: 16px;
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 5px;
 }
 
 .cs-tips li {
     font-size: 12px;
-    color: rgba(255, 255, 255, 0.42);
+    color: rgba(255, 255, 255, 0.4);
     line-height: 1.4;
-    padding-left: 14px;
-    position: relative;
 }
 
-.cs-tips li::before {
-    content: '→';
-    position: absolute;
-    left: 0;
-    color: rgba(0, 201, 58, 0.5);
-    font-size: 10px;
-}
+/* ── Toast ─────────────────────────────────── */
 
-/* ══════════════════════════════════════════════════════════
-   TOAST
-══════════════════════════════════════════════════════════ */
 .cs-toast {
     position: fixed;
     bottom: 28px;
     left: 50%;
     transform: translateX(-50%);
-    padding: 12px 22px;
-    border-radius: 12px;
-    background: rgba(15, 15, 25, 0.92);
-    border: 1px solid rgba(0, 201, 58, 0.3);
-    color: #00c93a;
-    font-size: 13.5px;
-    font-weight: 600;
-    backdrop-filter: blur(12px);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+    padding: 10px 20px;
+    background: #00c93a;
+    color: #000;
+    font-size: 12.5px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 8px;
     z-index: 999;
-    animation: cs-toast-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-    white-space: nowrap;
+    animation: toast-in 0.2s ease;
 }
 
-@keyframes cs-toast-in {
+@keyframes toast-in {
     from {
         opacity: 0;
-        transform: translateX(-50%) translateY(12px);
+        transform: translateX(-50%) translateY(10px);
     }
 
     to {
@@ -1106,37 +971,22 @@
     }
 }
 
-/* ══════════════════════════════════════════════════════════
-   RESPONSIVE
-══════════════════════════════════════════════════════════ */
-@media (max-width: 900px) {
-    .cs-preview-panel {
-        position: fixed;
-        right: 0;
-        top: 0;
-        bottom: 0;
-        z-index: 100;
-        width: 300px;
-        box-shadow: -12px 0 40px rgba(0, 0, 0, 0.4);
-    }
+/* ── Responsive ─────────────────────────────── */
 
-    .cs-channel-bar {
-        gap: 8px;
-    }
-}
-
-@media (max-width: 600px) {
-    .cs-topbar {
+@media (max-width: 768px) {
+    .cs-root {
         flex-direction: column;
-        align-items: flex-start;
-        gap: 10px;
+        height: auto;
+        margin: 0;
     }
 
-    .cs-var-grid {
+    .cs-preview-panel {
+        width: 100%;
+        border-left: none;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .cs-ai-row {
         grid-template-columns: 1fr;
-    }
-
-    .cs-tools-right {
-        flex-wrap: wrap;
     }
 }

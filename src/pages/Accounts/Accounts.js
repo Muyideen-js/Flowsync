@@ -99,9 +99,9 @@ const Accounts = () => {
 
     const socketRef = useRef(null);
     const userIdRef = useRef(null);
-    // Tracks whether the QR modal was opened by the USER clicking the button.
-    // Prevents the background pre-warm from auto-popping the modal on page load.
     const userOpenedModal = useRef(false);
+    // Track explicit user-triggered disconnects so auto-reconnect skips them
+    const tgExplicitDisconnect = useRef(false);
 
     // Derived
     const waReady = waState === 'ready';
@@ -127,12 +127,11 @@ const Accounts = () => {
             ...prev,
             twitter: ca.twitter?.connected ? { connected: true, handle: ca.twitter.handle || '@connected', lastSync: 'Synced' } : prev.twitter,
             instagram: ca.instagram?.connected ? { connected: true, handle: ca.instagram.handle || '@connected', lastSync: 'Synced' } : prev.instagram,
-            telegram: ca.telegram?.connected
+            // Only show telegram connected from Firestore if user has not explicitly disconnected this session
+            telegram: (ca.telegram?.connected && !tgExplicitDisconnect.current)
                 ? { connected: true, handle: ca.telegram.chatId || ca.telegram.handle || 'Bot connected', lastSync: 'Synced' }
                 : prev.telegram,
         }));
-        // Pre-fill Telegram modal fields from Firestore if available
-        if (ca.telegram?.chatId) setTgChatId(ca.telegram.chatId);
         if (ca.telegram?.botToken) setTgBotToken(ca.telegram.botToken);
     }, [userData]);
 
@@ -159,10 +158,12 @@ const Accounts = () => {
             console.log('[Accounts] Socket connected for user:', userData.uid.substring(0, 8));
             socket.emit('get_whatsapp_status');
             socket.emit('start_whatsapp');
-            // 🔄 Auto-reconnect Telegram bot from saved Firestore token
-            const savedToken = userData.connectedAccounts?.telegram?.botToken;
-            if (savedToken) {
-                socket.emit('connect_telegram_bot', { botToken: savedToken });
+            // Auto-reconnect Telegram bot from saved Firestore token ONLY if not explicitly disconnected
+            if (!tgExplicitDisconnect.current) {
+                const savedToken = userData.connectedAccounts?.telegram?.botToken;
+                if (savedToken) {
+                    socket.emit('connect_telegram_bot', { botToken: savedToken });
+                }
             }
         });
 
@@ -173,12 +174,9 @@ const Accounts = () => {
         });
 
         socket.on('tg_state', ({ state }) => {
+            // Always reflect actual bot state — idle/error means disconnected
             if (state === 'idle' || state === 'error') {
-                // Keep Firestore-based connected state if we have a token saved
-                const savedToken = userData.connectedAccounts?.telegram?.botToken;
-                if (!savedToken) {
-                    setConnections(prev => ({ ...prev, telegram: { connected: false, handle: null, lastSync: null } }));
-                }
+                setConnections(prev => ({ ...prev, telegram: { connected: false, handle: null, lastSync: null } }));
             }
         });
 
@@ -347,8 +345,24 @@ const Accounts = () => {
     const handleDisconnect = useCallback((id) => {
         if (!window.confirm(`Disconnect from ${id}?`)) return;
         if (id === 'whatsapp') { handleResetWA(); return; }
+        if (id === 'telegram') {
+            // Mark explicit disconnect so auto-reconnect is skipped
+            tgExplicitDisconnect.current = true;
+            // Clear local state immediately
+            setConnections(prev => ({ ...prev, telegram: { connected: false, handle: null, lastSync: null } }));
+            setTgBotToken('');
+            setTgChatId('');
+            // Clear from Firestore so refresh doesn't restore it
+            updateUserData({
+                'connectedAccounts.telegram': { connected: false, botToken: null, chatId: null, handle: null, connectedAt: null }
+            });
+            // Stop bot on backend
+            const socket = socketRef.current;
+            if (socket?.connected) socket.emit('disconnect_telegram_bot');
+            return;
+        }
         setConnections(prev => ({ ...prev, [id]: { connected: false, handle: null, lastSync: null } }));
-    }, [handleResetWA]);
+    }, [handleResetWA, updateUserData]);
 
     const connectedCount = [
         waReady,
@@ -459,72 +473,143 @@ const Accounts = () => {
 
                 {/* ════ WhatsApp QR Modal ════ */}
                 {qrModal && (
-                    <div className="qr-overlay" onClick={() => !waModalLock && setQrModal(false)}>
-                        <div className="qr-modal" onClick={e => e.stopPropagation()}>
+                    <div
+                        onClick={() => !waModalLock && setQrModal(false)}
+                        style={{
+                            position: 'fixed', inset: 0, zIndex: 1000,
+                            background: 'rgba(0,0,0,0.75)',
+                            backdropFilter: 'blur(12px)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            animation: 'tgFadeIn 0.2s ease',
+                        }}
+                    >
+                        <div
+                            onClick={e => e.stopPropagation()}
+                            style={{
+                                width: '100%', maxWidth: '400px',
+                                background: 'rgba(8,14,24,0.97)',
+                                border: '1px solid rgba(37,211,102,0.2)',
+                                boxShadow: '0 24px 48px rgba(0,0,0,0.6)',
+                                overflow: 'hidden',
+                                animation: 'tgSlideUp 0.28s cubic-bezier(0.16,1,0.3,1)',
+                                position: 'relative',
+                            }}
+                        >
+                            {/* Green accent bar */}
+                            <div style={{ height: '3px', background: 'linear-gradient(90deg, #25D366 0%, #1ebe5d 50%, transparent 100%)' }} />
 
-                            <button className="qr-close" onClick={() => { if (!waModalLock) setQrModal(false); }} disabled={waModalLock}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                                    <path d="M18 6L6 18M6 6l12 12" />
-                                </svg>
-                            </button>
+                            {/* Close */}
+                            {!waModalLock && (
+                                <button
+                                    onClick={() => setQrModal(false)}
+                                    style={{
+                                        position: 'absolute', top: '16px', right: '16px',
+                                        background: 'none', border: 'none', cursor: 'pointer',
+                                        color: 'rgba(255,255,255,0.3)', padding: '4px', display: 'flex',
+                                        transition: 'color 0.15s',
+                                    }}
+                                    onMouseEnter={e => e.currentTarget.style.color = '#fff'}
+                                    onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
+                                >
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12" /></svg>
+                                </button>
+                            )}
 
-                            <div className="qr-header">
-                                <div className="qr-icon-wrap" style={{ '--brand': '#25D366' }}>
-                                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M3 21l1.5-5.5A9 9 0 1116.5 19L3 21z" />
-                                    </svg>
+                            {/* Header */}
+                            <div style={{ padding: '26px 28px 18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                <div style={{
+                                    width: '38px', height: '38px', flexShrink: 0,
+                                    background: 'rgba(37,211,102,0.1)',
+                                    border: '1px solid rgba(37,211,102,0.25)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                }}>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#25D366" strokeWidth="1.8"><path d="M3 21l1.5-5.5A9 9 0 1116.5 19L3 21z" /></svg>
                                 </div>
-                                <h2>Connect WhatsApp</h2>
-                                <p>Scan with your phone to mirror your WhatsApp chats in FlowSync.</p>
+                                <div>
+                                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>WhatsApp</div>
+                                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', marginTop: '1px' }}>Scan QR to link your account</div>
+                                </div>
                             </div>
 
-                            <div className="qr-code-area">
-                                {waState === 'restoring' && (
-                                    <div className="qr-spinner-wrap">
-                                        <div className="qr-spinner" />
-                                        <p>Generating QR code…</p>
-                                        <p style={{ fontSize: '11px', opacity: 0.5, marginTop: '6px' }}>This takes 10–20 seconds on first launch</p>
-                                    </div>
+                            {/* Divider */}
+                            <div style={{ height: '1px', background: 'rgba(255,255,255,0.05)', margin: '0 28px' }} />
+
+                            {/* QR area */}
+                            <div style={{ padding: '24px 28px', display: 'flex', flexDirection: 'column', alignItems: 'center', minHeight: '200px', justifyContent: 'center', gap: '10px' }}>
+                                {(waState === 'restoring' || (waState === 'qr' && !qrSrc)) && (
+                                    <>
+                                        <div className="qr-spinner" style={{ width: '32px', height: '32px', borderTopColor: '#25D366' }} />
+                                        <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', marginTop: '6px' }}>Generating QR code…</div>
+                                        {waState === 'restoring' && <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)' }}>10–20 s on first launch</div>}
+                                    </>
                                 )}
                                 {waState === 'qr' && qrSrc && (
-                                    <img src={qrSrc} alt="WhatsApp QR Code" className="qr-image" />
-                                )}
-                                {waState === 'qr' && !qrSrc && (
-                                    <div className="qr-spinner-wrap">
-                                        <div className="qr-spinner" /><p>Generating QR…</p>
-                                    </div>
+                                    <img src={qrSrc} alt="WhatsApp QR" style={{ width: '200px', height: '200px', display: 'block' }} />
                                 )}
                                 {waState === 'authenticated' && (
-                                    <div className="qr-spinner-wrap">
-                                        <div className="qr-spinner" style={{ borderTopColor: '#25D366' }} />
-                                        <p>✅ QR scanned! Syncing chats…</p>
-                                    </div>
+                                    <>
+                                        <div className="qr-spinner" style={{ width: '32px', height: '32px', borderTopColor: '#25D366' }} />
+                                        <div style={{ fontSize: '13px', color: '#25D366', fontWeight: 600 }}>QR scanned — syncing…</div>
+                                    </>
                                 )}
                                 {waState === 'ready' && (
-                                    <div className="qr-spinner-wrap">
-                                        <p style={{ fontSize: '2.5rem' }}>✅</p>
-                                        <p style={{ fontWeight: 600 }}>WhatsApp Connected!</p>
-                                    </div>
+                                    <>
+                                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#25D366" strokeWidth="2"><polyline points="20 6 9 17 4 12" /></svg>
+                                        <div style={{ fontSize: '14px', fontWeight: 700, color: '#25D366' }}>WhatsApp Connected</div>
+                                    </>
                                 )}
                                 {waState === 'error' && (
-                                    <div className="qr-spinner-wrap">
-                                        <p style={{ color: '#ef4444', fontSize: '1rem' }}>❌ Connection failed.</p>
-                                        <button className="ac-btn" style={{ marginTop: '12px' }} onClick={handleConnectWA}>Retry</button>
-                                    </div>
+                                    <>
+                                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(239,68,68,0.8)" strokeWidth="2"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
+                                        <div style={{ fontSize: '13px', color: 'rgba(239,68,68,0.9)' }}>Connection failed</div>
+                                        <button
+                                            onClick={handleConnectWA}
+                                            style={{
+                                                marginTop: '8px', padding: '8px 20px',
+                                                background: 'rgba(37,211,102,0.1)',
+                                                border: '1px solid rgba(37,211,102,0.3)',
+                                                color: '#25D366', fontSize: '12px', fontWeight: 600,
+                                                cursor: 'pointer', fontFamily: 'inherit',
+                                                transition: 'background 0.15s',
+                                            }}
+                                        >Retry</button>
+                                    </>
                                 )}
                             </div>
 
-                            <div className="qr-steps">
-                                <div className="qr-step"><span className="qr-step-num">1</span><span>Open WhatsApp on your phone</span></div>
-                                <div className="qr-step"><span className="qr-step-num">2</span><span>Tap Menu (⋮) → Linked Devices</span></div>
-                                <div className="qr-step"><span className="qr-step-num">3</span><span>Tap "Link a Device" and scan</span></div>
+                            {/* Divider */}
+                            <div style={{ height: '1px', background: 'rgba(255,255,255,0.05)', margin: '0 28px' }} />
+
+                            {/* Steps */}
+                            <div style={{ padding: '14px 28px 20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                {[['1', 'Open WhatsApp on your phone'], ['2', 'Tap Menu → Linked Devices'], ['3', 'Tap "Link a Device" and scan']].map(([n, t]) => (
+                                    <div key={n} style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                        <span style={{
+                                            width: '18px', height: '18px', flexShrink: 0,
+                                            background: 'rgba(37,211,102,0.12)',
+                                            border: '1px solid rgba(37,211,102,0.2)',
+                                            fontSize: '10px', fontWeight: 700, color: '#25D366',
+                                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        }}>{n}</span>
+                                        <span style={{ fontSize: '12px', color: 'rgba(255,255,255,0.45)' }}>{t}</span>
+                                    </div>
+                                ))}
                             </div>
 
+                            {/* Reset */}
                             {!waBusy && waState !== 'ready' && (
-                                <div style={{ textAlign: 'center', paddingBottom: '16px' }}>
-                                    <button className="ac-btn danger" style={{ fontSize: '12px' }} onClick={handleResetWA}>
-                                        Reset &amp; Start Over
-                                    </button>
+                                <div style={{ padding: '0 28px 20px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                    <button
+                                        onClick={handleResetWA}
+                                        style={{
+                                            width: '100%', padding: '9px',
+                                            background: 'rgba(239,68,68,0.07)',
+                                            border: '1px solid rgba(239,68,68,0.18)',
+                                            color: 'rgba(239,68,68,0.7)', fontSize: '12px',
+                                            cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600,
+                                            letterSpacing: '0.04em', transition: 'background 0.15s',
+                                        }}
+                                    >Reset &amp; Start Over</button>
                                 </div>
                             )}
                         </div>
@@ -578,24 +663,19 @@ const Accounts = () => {
                             </button>
 
                             {/* Header */}
-                            <div style={{ padding: '28px 28px 20px' }}>
+                            <div style={{ padding: '26px 28px 18px', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                 <div style={{
-                                    display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px',
+                                    width: '38px', height: '38px',
+                                    background: 'rgba(0,136,204,0.1)',
+                                    border: '1px solid rgba(0,136,204,0.25)',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    flexShrink: 0,
                                 }}>
-                                    <div style={{
-                                        width: '38px', height: '38px',
-                                        background: 'rgba(0,136,204,0.15)',
-                                        border: '1px solid rgba(0,136,204,0.3)',
-                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                        flexShrink: 0,
-                                        boxShadow: '0 0 16px rgba(0,136,204,0.2)',
-                                    }}>
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0088CC" strokeWidth="1.8"><path d="M22 2L11 13" /><path d="M22 2L15 22l-4-9-9-4L22 2z" /></svg>
-                                    </div>
-                                    <div>
-                                        <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>Telegram Bot</div>
-                                        <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', marginTop: '1px' }}>Bring your own bot from @BotFather</div>
-                                    </div>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0088CC" strokeWidth="1.8"><path d="M22 2L11 13" /><path d="M22 2L15 22l-4-9-9-4L22 2z" /></svg>
+                                </div>
+                                <div>
+                                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>Telegram Bot</div>
+                                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', marginTop: '1px' }}>Bring your own bot from @BotFather</div>
                                 </div>
                             </div>
 
@@ -604,6 +684,7 @@ const Accounts = () => {
 
                             {/* Body */}
                             <div style={{ padding: '20px 28px 24px' }}>
+
                                 {/* BotFather link */}
                                 <a
                                     href="https://t.me/BotFather"
@@ -662,20 +743,17 @@ const Accounts = () => {
                                         fontSize: '13px', fontWeight: 700,
                                         letterSpacing: '0.06em', textTransform: 'uppercase',
                                         transition: 'all 0.2s',
-                                        boxShadow: tgBotToken.trim() ? '0 0 24px rgba(0,136,204,0.3)' : 'none',
                                         fontFamily: 'inherit',
-                                        animation: tgBotToken.trim() ? 'tgPulseGlow 2.5s ease-in-out infinite' : 'none',
                                     }}
                                 >
-                                    {tgSaving ? '⏳ Connecting…' : '⚡ Connect Bot'}
+                                    {tgSaving ? 'Connecting…' : 'Connect Bot'}
                                 </button>
-                            </div>
+                            </div>{/* /body */}
 
-                            {/* Inline keyframes via style tag */}
+                            {/* Keyframe animations */}
                             <style>{`
                                 @keyframes tgFadeIn { from { opacity: 0 } to { opacity: 1 } }
                                 @keyframes tgSlideUp { from { opacity: 0; transform: translateY(20px) scale(0.97) } to { opacity: 1; transform: translateY(0) scale(1) } }
-                                @keyframes tgPulseGlow { 0%,100% { box-shadow: 0 0 24px rgba(0,136,204,0.3) } 50% { box-shadow: 0 0 36px rgba(0,136,204,0.55), 0 0 12px rgba(0,170,238,0.3) } }
                             `}</style>
                         </div>
                     </div>

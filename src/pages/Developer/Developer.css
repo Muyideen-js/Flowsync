@@ -1,0 +1,844 @@
+/* ═══════════════════════════════════════════
+   DEVELOPER — flat, dark, no gradients, no glows
+   ═══════════════════════════════════════════ */
+
+.dev-page {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.dev-page.loaded {
+    opacity: 1;
+}
+
+/* ── Entrance ───────────────────────────── */
+.dev-anim {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: calc(var(--i, 0) * 0.06s);
+}
+
+.dev-page.loaded .dev-anim {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* ── Hero ───────────────────────────────── */
+.dev-hero {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    gap: 16px;
+}
+
+.dev-tag {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: rgba(255, 255, 255, 0.2);
+    margin-bottom: 5px;
+}
+
+.dev-hero h1 {
+    font-size: 22px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.04em;
+    margin: 0 0 4px;
+}
+
+.dev-hero p {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.3);
+    margin: 0;
+}
+
+.dev-hero-badges {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.dev-badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    padding: 4px 10px;
+    border: 1px solid;
+}
+
+.dev-badge.green {
+    color: #00c93a;
+    border-color: rgba(0, 201, 58, 0.2);
+    background: rgba(0, 201, 58, 0.07);
+}
+
+.dev-badge.grey {
+    color: rgba(255, 255, 255, 0.35);
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+}
+
+/* ── Tab strip ──────────────────────────── */
+.dev-tabs {
+    display: flex;
+    gap: 1px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dev-tab {
+    padding: 10px 18px;
+    font-size: 12.5px;
+    font-weight: 500;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: rgba(255, 255, 255, 0.32);
+    cursor: pointer;
+    font-family: inherit;
+    margin-bottom: -1px;
+    transition: all 0.12s;
+    letter-spacing: -0.01em;
+}
+
+.dev-tab:hover {
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.dev-tab.active {
+    color: #fff;
+    border-bottom-color: #00c93a;
+    font-weight: 600;
+}
+
+/* ── Shared layout pieces ───────────────── */
+.dev-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.dev-section-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.dev-section-head h2 {
+    font-size: 14px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.75);
+    letter-spacing: -0.02em;
+    margin: 0 0 3px;
+}
+
+.dev-section-head p {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.25);
+    margin: 0;
+}
+
+/* ── Buttons ────────────────────────────── */
+.dev-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 7px 14px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.12s;
+    flex-shrink: 0;
+}
+
+.dev-btn.primary {
+    background: #00c93a;
+    border-color: #00c93a;
+    color: #000;
+}
+
+.dev-btn.primary:hover {
+    background: #00b535;
+}
+
+.dev-btn.ghost {
+    background: rgba(255, 255, 255, 0.04);
+    border-color: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.42);
+}
+
+.dev-btn.ghost:hover {
+    color: rgba(255, 255, 255, 0.8);
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
+.dev-icon-btn {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.35);
+    cursor: pointer;
+    transition: all 0.12s;
+    flex-shrink: 0;
+}
+
+.dev-icon-btn:hover {
+    color: rgba(255, 255, 255, 0.8);
+    border-color: rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.dev-icon-btn.danger:hover {
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.2);
+    background: rgba(239, 68, 68, 0.07);
+}
+
+/* ── Forms ──────────────────────────────── */
+.dev-input {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    outline: none;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.8);
+    font-family: inherit;
+    transition: border-color 0.12s;
+}
+
+.dev-input::placeholder {
+    color: rgba(255, 255, 255, 0.2);
+}
+
+.dev-input:focus {
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.dev-create-form {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    padding: 14px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.dev-wh-form {
+    flex-wrap: wrap;
+}
+
+.dev-wh-form .dev-input {
+    min-width: 250px;
+}
+
+.dev-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    background: rgba(245, 158, 11, 0.05);
+    border: 1px solid rgba(245, 158, 11, 0.15);
+    font-size: 12px;
+    color: rgba(245, 158, 11, 0.75);
+}
+
+/* ── API Key cards ──────────────────────── */
+.dev-keys-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dev-key-card {
+    background: #08090d;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: background 0.12s;
+}
+
+.dev-key-card:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.dev-key-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.dev-key-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.dev-key-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.dev-key-status {
+    font-size: 9.5px;
+    font-weight: 700;
+    padding: 2px 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+}
+
+.dev-key-status.active {
+    color: #00c93a;
+    background: rgba(0, 201, 58, 0.1);
+    border: 1px solid rgba(0, 201, 58, 0.18);
+}
+
+.dev-key-status.inactive {
+    color: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.dev-key-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.dev-key-value {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 9px 12px;
+    overflow-x: auto;
+}
+
+.dev-key-value code {
+    font-size: 11.5px;
+    color: rgba(0, 201, 58, 0.7);
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    font-family: 'Courier New', monospace;
+}
+
+.dev-key-meta {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.dev-key-meta span {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.22);
+}
+
+/* ── Code block ─────────────────────────── */
+.dev-code-block {
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    background: #05060a;
+}
+
+.dev-cb-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 14px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.2);
+}
+
+.dev-code-block pre {
+    margin: 0;
+    padding: 14px;
+    font-size: 12.5px;
+    color: rgba(0, 201, 58, 0.7);
+    font-family: 'Courier New', monospace;
+    line-height: 1.7;
+    overflow-x: auto;
+    white-space: pre;
+}
+
+/* ── Webhook cards ──────────────────────── */
+.dev-wh-events-legend {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 10px 0;
+}
+
+.dev-legend-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.2);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-right: 4px;
+}
+
+.dev-event-chip {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    background: rgba(129, 140, 248, 0.08);
+    border: 1px solid rgba(129, 140, 248, 0.18);
+    color: #818cf8;
+    font-family: 'Courier New', monospace;
+}
+
+.dev-wh-list {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dev-wh-card {
+    background: #08090d;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: background 0.12s;
+}
+
+.dev-wh-card.inactive {
+    opacity: 0.5;
+}
+
+.dev-wh-card:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.dev-wh-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.dev-wh-url {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: rgba(255, 255, 255, 0.3);
+    overflow: hidden;
+}
+
+.dev-wh-url code {
+    font-size: 12.5px;
+    color: rgba(255, 255, 255, 0.6);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dev-wh-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.dev-wh-events {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.dev-wh-stats {
+    display: flex;
+    gap: 8px;
+}
+
+.dev-stat-pill {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 2px 8px;
+    letter-spacing: 0.04em;
+}
+
+.dev-stat-pill.green {
+    color: #00c93a;
+    background: rgba(0, 201, 58, 0.08);
+    border: 1px solid rgba(0, 201, 58, 0.18);
+}
+
+.dev-stat-pill.red {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.18);
+}
+
+/* ── Docs / Endpoints ───────────────────── */
+.dev-docs-intro {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.dev-docs-intro h2 {
+    font-size: 14px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.75);
+    letter-spacing: -0.02em;
+    margin: 0 0 4px;
+}
+
+.dev-docs-intro p {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.25);
+    margin: 0;
+}
+
+.dev-docs-intro code {
+    color: rgba(0, 201, 58, 0.7);
+    font-family: 'Courier New', monospace;
+}
+
+.dev-auth-note {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 13px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.3);
+    flex-shrink: 0;
+}
+
+.dev-auth-note code {
+    color: rgba(0, 201, 58, 0.65);
+    font-family: 'Courier New', monospace;
+}
+
+.dev-endpoints {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dev-ep {
+    background: #08090d;
+    cursor: pointer;
+    transition: background 0.12s;
+}
+
+.dev-ep:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.dev-ep.expanded {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.dev-ep-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+}
+
+.dev-method {
+    font-size: 9.5px;
+    font-weight: 800;
+    padding: 3px 8px;
+    letter-spacing: 0.07em;
+    font-family: 'Courier New', monospace;
+    flex-shrink: 0;
+    min-width: 52px;
+    text-align: center;
+}
+
+.dev-method.get {
+    color: #00c93a;
+    background: rgba(0, 201, 58, 0.08);
+    border: 1px solid rgba(0, 201, 58, 0.18);
+}
+
+.dev-method.post {
+    color: #818cf8;
+    background: rgba(129, 140, 248, 0.08);
+    border: 1px solid rgba(129, 140, 248, 0.18);
+}
+
+.dev-method.delete {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.08);
+    border: 1px solid rgba(239, 68, 68, 0.18);
+}
+
+.dev-ep-path {
+    font-size: 12.5px;
+    color: rgba(255, 255, 255, 0.65);
+    font-family: 'Courier New', monospace;
+    flex-shrink: 0;
+}
+
+.dev-ep-desc {
+    flex: 1;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.28);
+}
+
+.dev-ep-pub {
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 7px;
+    color: #f59e0b;
+    background: rgba(245, 158, 11, 0.08);
+    border: 1px solid rgba(245, 158, 11, 0.18);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    flex-shrink: 0;
+}
+
+.dev-ep-detail {
+    padding: 0 16px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.dev-ep-response {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dev-resp-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.2);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.dev-ep-response pre {
+    margin: 0;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.4);
+    font-family: 'Courier New', monospace;
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ── Usage ──────────────────────────────── */
+.dev-usage-kpis {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dev-kpi {
+    background: #08090d;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.dev-kpi-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.22);
+}
+
+.dev-kpi-value {
+    font-size: 24px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.05em;
+    line-height: 1;
+}
+
+.dev-kpi-change {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 6px;
+}
+
+.dev-kpi-change.up {
+    color: #00c93a;
+    background: rgba(0, 201, 58, 0.08);
+}
+
+.dev-kpi-change.down {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.08);
+}
+
+.dev-chart-wrap {
+    background: #08090d;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    padding: 16px 20px;
+}
+
+.dev-chart-label {
+    font-size: 10px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.2);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 14px;
+}
+
+.dev-bar-chart {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    height: 120px;
+}
+
+.dev-bar-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 1;
+    gap: 5px;
+    height: 100%;
+}
+
+.dev-bar-track {
+    flex: 1;
+    width: 100%;
+    display: flex;
+    align-items: flex-end;
+}
+
+.dev-bar-fill {
+    width: 100%;
+    background: #00c93a;
+    min-height: 2px;
+    transition: height 0.6s ease;
+}
+
+.dev-bar-day {
+    font-size: 9.5px;
+    color: rgba(255, 255, 255, 0.25);
+    font-weight: 600;
+    text-align: center;
+}
+
+.dev-bar-val {
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.18);
+    text-align: center;
+}
+
+/* ── Usage table ────────────────────────── */
+.dev-usage-table {
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dev-ut-header {
+    display: grid;
+    grid-template-columns: 1fr 80px 80px 80px;
+    padding: 9px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(255, 255, 255, 0.2);
+}
+
+.dev-ut-row {
+    display: grid;
+    grid-template-columns: 1fr 80px 80px 80px;
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    align-items: center;
+    background: #08090d;
+    transition: background 0.12s;
+}
+
+.dev-ut-row:last-child {
+    border-bottom: none;
+}
+
+.dev-ut-row:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.dev-ut-row code {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.55);
+    font-family: 'Courier New', monospace;
+}
+
+.dev-ut-row span {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.dev-err {
+    color: #ef4444 !important;
+}
+
+.dev-ok {
+    color: rgba(0, 201, 58, 0.6) !important;
+}
+
+/* ── Responsive ─────────────────────────── */
+@media (max-width: 900px) {
+    .dev-usage-kpis {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .dev-ep-desc {
+        display: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .dev-hero {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+
+    .dev-usage-kpis {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .dev-ut-header,
+    .dev-ut-row {
+        grid-template-columns: 1fr 60px 60px;
+    }
+
+    .dev-ut-header span:last-child,
+    .dev-ut-row span:last-child {
+        display: none;
+    }
+}

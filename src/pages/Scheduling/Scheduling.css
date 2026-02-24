@@ -1,284 +1,264 @@
-/* ───────────────────────────────────────────
-   SCHEDULER PAGE
-   ─────────────────────────────────────────── */
-
-.anim-s {
-    opacity: 0;
-    transform: translateY(16px);
-    transition:
-        opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
-        transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-    transition-delay: calc(var(--i, 0) * 0.08s);
-}
-
-.sched.loaded .anim-s {
-    opacity: 1;
-    transform: translateY(0);
-}
+/* ═══════════════════════════════════════════
+   SCHEDULING — flat, dark, no gradients, no glows
+   ═══════════════════════════════════════════ */
 
 .sched {
-    max-width: 1100px;
-    margin: 0 auto;
     display: flex;
     flex-direction: column;
     gap: 20px;
 }
 
-/* ── Header ───────────────────────────────── */
+/* ── Page entrance ──────────────────────── */
+.anim-s {
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    transition-delay: calc(var(--i, 0) * 0.07s);
+}
 
+.loaded .anim-s {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* ── Page header ────────────────────────── */
 .sc-head {
     display: flex;
-    align-items: flex-start;
+    align-items: flex-end;
     justify-content: space-between;
-    gap: 16px;
+    padding-bottom: 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .sc-head h1 {
     font-size: 22px;
-    font-weight: 700;
-    color: #f5f5f5;
-    letter-spacing: -0.03em;
-    margin: 0 0 4px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.04em;
+    margin: 0 0 3px;
 }
 
 .sc-head p {
-    font-size: 13.5px;
-    color: rgba(255, 255, 255, 0.45);
+    font-size: 12.5px;
+    color: rgba(255, 255, 255, 0.28);
     margin: 0;
 }
 
 .sc-head-right {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
 }
 
-/* View switcher */
+/* ── View switcher ──────────────────────── */
 .sc-view-switcher {
     display: flex;
-    background: rgba(255, 255, 255, 0.04);
+    gap: 1px;
+    background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 8px;
-    overflow: hidden;
 }
 
 .sc-view-btn {
-    padding: 7px 14px;
-    font-size: 12px;
+    font-size: 11.5px;
     font-weight: 600;
-    color: rgba(255, 255, 255, 0.45);
-    background: transparent;
+    padding: 6px 14px;
+    background: none;
     border: none;
+    color: rgba(255, 255, 255, 0.3);
     cursor: pointer;
-    transition: all 0.15s ease;
     font-family: inherit;
+    transition: all 0.12s;
+    letter-spacing: 0.01em;
 }
 
 .sc-view-btn:hover {
     color: rgba(255, 255, 255, 0.7);
+    background: rgba(255, 255, 255, 0.03);
 }
 
 .sc-view-btn.active {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.07);
     color: #fff;
 }
 
+/* ── New Post button ────────────────────── */
 .sc-new-btn {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
-    background: var(--accent, #00c93a);
+    gap: 7px;
+    font-size: 12.5px;
+    font-weight: 700;
+    padding: 7px 14px;
+    background: #00c93a;
     border: none;
-    border-radius: 8px;
     color: #000;
-    font-size: 13px;
-    font-weight: 600;
     cursor: pointer;
-    transition: all 0.15s ease;
     font-family: inherit;
+    transition: background 0.12s;
 }
 
 .sc-new-btn:hover {
-    filter: brightness(1.15);
-    transform: translateY(-1px);
+    background: #00b535;
 }
 
-/* ── Stats Strip ──────────────────────────── */
-
+/* ── Stats strip ────────────────────────── */
 .sc-stats {
     display: flex;
     align-items: center;
-    gap: 20px;
-    padding: 16px 22px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 12px;
+    gap: 0;
+    padding: 16px 20px;
+    background: #08090d;
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .sc-stat {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 3px;
+    flex: 1;
+    text-align: center;
 }
 
 .sc-stat-val {
-    font-size: 20px;
-    font-weight: 700;
-    color: #f5f5f5;
+    font-size: 24px;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.05em;
+    line-height: 1;
 }
 
 .sc-failed-val {
-    color: #ff6b6b;
+    color: #ef4444;
 }
 
 .sc-stat-label {
-    font-size: 11.5px;
-    color: rgba(255, 255, 255, 0.4);
-    font-weight: 500;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.22);
 }
 
 .sc-stat-div {
     width: 1px;
-    height: 28px;
-    background: rgba(255, 255, 255, 0.08);
+    height: 36px;
+    background: rgba(255, 255, 255, 0.06);
+    flex-shrink: 0;
 }
 
-/* ── Tabs ──────────────────────────────────── */
-
+/* ── Filter tabs ────────────────────────── */
 .sc-tabs {
     display: flex;
-    gap: 4px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 10px;
-    padding: 4px;
+    gap: 1px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .sc-tab {
     display: flex;
     align-items: center;
-    gap: 6px;
-    padding: 8px 16px;
-    border-radius: 8px;
-    background: transparent;
+    gap: 8px;
+    padding: 10px 16px;
+    font-size: 12.5px;
+    font-weight: 500;
+    background: none;
     border: none;
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 13px;
-    font-weight: 600;
+    border-bottom: 2px solid transparent;
+    color: rgba(255, 255, 255, 0.3);
     cursor: pointer;
-    transition: all 0.15s ease;
     font-family: inherit;
-    text-transform: capitalize;
+    transition: all 0.12s;
+    margin-bottom: -1px;
 }
 
 .sc-tab:hover {
-    color: rgba(255, 255, 255, 0.8);
+    color: rgba(255, 255, 255, 0.7);
 }
 
 .sc-tab.active {
-    background: rgba(255, 255, 255, 0.08);
     color: #fff;
+    border-bottom-color: #00c93a;
+    font-weight: 600;
+}
+
+.sc-tab.has-failed {
+    color: #ef4444;
+}
+
+.sc-tab.has-failed.active {
+    border-bottom-color: #ef4444;
+}
+
+.sc-tab-name {
+    white-space: nowrap;
+}
+
+.sc-tab-count {
+    font-size: 10px;
+    font-weight: 700;
+    padding: 1px 6px;
+    background: rgba(255, 255, 255, 0.06);
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.sc-tab.active .sc-tab-count {
+    background: rgba(0, 201, 58, 0.1);
+    color: #00c93a;
 }
 
 .sc-tab.has-failed .sc-tab-count {
-    background: rgba(255, 107, 107, 0.15);
-    color: #ff6b6b;
+    background: rgba(239, 68, 68, 0.08);
+    color: #ef4444;
 }
 
-.sc-tab-name {}
-
-.sc-tab-count {
-    font-size: 11px;
-    font-weight: 700;
-    padding: 2px 7px;
-    border-radius: 100px;
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.5);
-}
-
-/* ── Post List ────────────────────────────── */
-
+/* ── Post list ──────────────────────────── */
 .sc-list {
     display: flex;
     flex-direction: column;
-    gap: 6px;
-}
-
-.sc-empty {
-    text-align: center;
-    padding: 60px 20px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-}
-
-.sc-empty p {
-    font-size: 14px;
-    color: rgba(255, 255, 255, 0.5);
-    margin: 0;
-    font-weight: 500;
-}
-
-.sc-empty span {
-    font-size: 12.5px;
-    color: rgba(255, 255, 255, 0.3);
+    gap: 1px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .sc-post {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    padding: 14px 18px;
-    background: rgba(255, 255, 255, 0.025);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    border-radius: 10px;
-    transition: all 0.15s ease;
-    animation: post-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
-    animation-delay: calc(var(--j, 0) * 0.04s);
-}
-
-@keyframes post-in {
-    0% {
-        opacity: 0;
-        transform: translateY(8px);
-    }
-
-    100% {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    gap: 14px;
+    padding: 14px 16px;
+    background: #08090d;
+    transition: background 0.12s;
 }
 
 .sc-post:hover {
-    border-color: rgba(255, 255, 255, 0.1);
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(255, 255, 255, 0.025);
 }
 
 .sc-post.failed-post {
-    border-color: rgba(255, 107, 107, 0.15);
-    background: rgba(255, 107, 107, 0.03);
+    border-left: 2px solid #ef4444;
 }
 
 .sc-post-left {
     display: flex;
-    align-items: center;
-    gap: 14px;
+    align-items: flex-start;
+    gap: 12px;
     flex: 1;
     min-width: 0;
 }
 
 .sc-badge {
-    font-size: 10px;
-    font-weight: 700;
-    padding: 4px 10px;
-    border-radius: 100px;
-    background: color-mix(in srgb, var(--ch) 14%, transparent);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    padding: 3px 7px;
     color: var(--ch);
-    white-space: nowrap;
+    background: color-mix(in srgb, var(--ch) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--ch) 22%, transparent);
     flex-shrink: 0;
+    margin-top: 1px;
 }
 
 .sc-post-info {
@@ -287,13 +267,13 @@
 }
 
 .sc-post-text {
-    font-size: 13.5px;
-    color: rgba(255, 255, 255, 0.8);
-    margin: 0 0 6px;
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.65);
+    margin: 0 0 5px;
     line-height: 1.4;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .sc-post-meta {
@@ -304,208 +284,238 @@
 }
 
 .sc-post-type {
-    font-size: 11px;
-    font-weight: 600;
-    padding: 2px 7px;
-    border-radius: 4px;
-    background: rgba(255, 255, 255, 0.05);
-    color: rgba(255, 255, 255, 0.45);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgba(255, 255, 255, 0.22);
 }
 
 .sc-post-date {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.35);
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.28);
 }
 
 .sc-status {
-    font-size: 11px;
-    font-weight: 600;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 2px 7px;
     color: var(--st);
+    background: color-mix(in srgb, var(--st) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--st) 20%, transparent);
 }
 
+/* ── Post actions ───────────────────────── */
 .sc-post-actions {
     display: flex;
-    gap: 6px;
+    gap: 5px;
     flex-shrink: 0;
 }
 
 .sc-action {
+    font-size: 11px;
+    font-weight: 600;
     padding: 5px 12px;
-    border-radius: 6px;
     background: rgba(255, 255, 255, 0.04);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 12px;
-    font-weight: 500;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.38);
     cursor: pointer;
-    transition: all 0.15s ease;
     font-family: inherit;
+    transition: all 0.12s;
     display: flex;
     align-items: center;
-    gap: 4px;
+    gap: 5px;
 }
 
 .sc-action:hover {
-    border-color: rgba(255, 255, 255, 0.12);
     color: rgba(255, 255, 255, 0.8);
-}
-
-.sc-action.danger {
-    color: rgba(255, 107, 107, 0.6);
-}
-
-.sc-action.danger:hover {
-    background: rgba(255, 107, 107, 0.08);
-    border-color: rgba(255, 107, 107, 0.2);
-    color: #ff6b6b;
+    border-color: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.06);
 }
 
 .sc-action.retry {
-    background: rgba(255, 167, 38, 0.08);
-    border-color: rgba(255, 167, 38, 0.2);
-    color: #ffa726;
+    color: #f59e0b;
+    border-color: rgba(245, 158, 11, 0.2);
+    background: rgba(245, 158, 11, 0.06);
 }
 
 .sc-action.retry:hover {
-    background: rgba(255, 167, 38, 0.14);
+    background: rgba(245, 158, 11, 0.12);
 }
 
-/* ── Calendar View ────────────────────────── */
+.sc-action.danger {
+    color: rgba(239, 68, 68, 0.6);
+    border-color: rgba(239, 68, 68, 0.12);
+}
 
+.sc-action.danger:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.07);
+    border-color: rgba(239, 68, 68, 0.2);
+}
+
+/* ── Empty state ────────────────────────── */
+.sc-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 52px 24px;
+    color: rgba(255, 255, 255, 0.12);
+}
+
+.sc-empty p {
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.25);
+    margin: 4px 0 2px;
+}
+
+.sc-empty span {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.18);
+}
+
+/* ═══════ CALENDAR VIEW ════════════════════ */
 .sc-calendar {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 14px;
-    padding: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: #08090d;
 }
 
 .sc-cal-header {
-    margin-bottom: 18px;
+    padding: 14px 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .sc-cal-header h2 {
-    font-size: 18px;
+    font-size: 14px;
     font-weight: 700;
-    color: #f5f5f5;
+    color: rgba(255, 255, 255, 0.6);
+    letter-spacing: -0.02em;
     margin: 0;
 }
 
 .sc-cal-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 2px;
 }
 
 .sc-cal-day-header {
-    padding: 8px;
-    font-size: 11px;
-    font-weight: 600;
-    color: rgba(255, 255, 255, 0.35);
-    text-align: center;
+    padding: 10px 10px 8px;
+    font-size: 10px;
+    font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.05em;
+    letter-spacing: 0.1em;
+    color: rgba(255, 255, 255, 0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-right: 1px solid rgba(255, 255, 255, 0.04);
+    text-align: center;
 }
 
 .sc-cal-cell {
     min-height: 90px;
     padding: 8px;
-    border: 1px solid rgba(255, 255, 255, 0.04);
-    border-radius: 8px;
-    transition: all 0.15s ease;
+    border-right: 1px solid rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    transition: background 0.12s;
 }
 
 .sc-cal-cell:hover:not(.empty) {
-    background: rgba(255, 255, 255, 0.03);
-    border-color: rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.02);
 }
 
 .sc-cal-cell.empty {
-    opacity: 0.3;
+    background: rgba(0, 0, 0, 0.15);
 }
 
 .sc-cal-cell.today {
-    border-color: rgba(0, 150, 45, 0.25);
-    background: rgba(0, 150, 45, 0.04);
+    background: rgba(0, 201, 58, 0.04);
+    border: 1px solid rgba(0, 201, 58, 0.14);
 }
 
 .sc-cal-num {
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
-    color: rgba(255, 255, 255, 0.6);
+    color: rgba(255, 255, 255, 0.25);
     display: block;
-    margin-bottom: 6px;
+    margin-bottom: 3px;
 }
 
 .sc-cal-cell.today .sc-cal-num {
-    color: var(--accent, #00c93a);
+    color: #00c93a;
 }
 
 .sc-cal-posts {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: 2px;
 }
 
 .sc-cal-post {
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 3px 5px;
-    border-radius: 4px;
+    padding: 2px 5px;
     background: color-mix(in srgb, var(--ch) 8%, transparent);
+    border-left: 2px solid var(--ch);
     overflow: hidden;
 }
 
 .sc-cal-badge {
     font-size: 8px;
-    font-weight: 700;
+    font-weight: 800;
     color: var(--ch);
     flex-shrink: 0;
 }
 
 .sc-cal-text {
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.5);
+    font-size: 9.5px;
+    color: rgba(255, 255, 255, 0.42);
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap;
 }
 
 .sc-cal-more {
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.35);
-    padding: 2px 5px;
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.2);
+    font-weight: 600;
+    letter-spacing: 0.04em;
 }
 
-/* ── Timeline View ────────────────────────── */
-
+/* ═══════ TIMELINE VIEW ════════════════════ */
 .sc-timeline {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 14px;
-    padding: 22px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: #08090d;
 }
 
 .sc-tl-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 20px;
+    padding: 14px 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .sc-tl-header h2 {
-    font-size: 18px;
+    font-size: 14px;
     font-weight: 700;
-    color: #f5f5f5;
+    color: rgba(255, 255, 255, 0.6);
+    letter-spacing: -0.02em;
     margin: 0;
 }
 
 .sc-tl-date {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.4);
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.22);
 }
 
 .sc-tl-track {
@@ -516,179 +526,136 @@
 .sc-tl-row {
     display: grid;
     grid-template-columns: 80px 24px 1fr;
-    gap: 12px;
-    padding: 10px 0;
-    align-items: start;
+    gap: 0;
+    align-items: flex-start;
     min-height: 44px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    transition: background 0.12s;
+}
+
+.sc-tl-row:last-child {
+    border-bottom: none;
+}
+
+.sc-tl-row.has-posts {
+    background: rgba(255, 255, 255, 0.015);
 }
 
 .sc-tl-time {
-    font-size: 12px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.35);
-    text-align: right;
-    padding-top: 2px;
+    font-size: 10.5px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.2);
+    padding: 12px 8px 12px 16px;
+    white-space: nowrap;
+    font-feature-settings: 'tnum';
 }
 
 .sc-tl-row.has-posts .sc-tl-time {
-    color: rgba(255, 255, 255, 0.6);
-    font-weight: 600;
+    color: rgba(255, 255, 255, 0.5);
 }
 
 .sc-tl-line {
     display: flex;
     flex-direction: column;
     align-items: center;
-    position: relative;
-    height: 100%;
-    min-height: 24px;
-}
-
-.sc-tl-line::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    width: 1px;
-    background: rgba(255, 255, 255, 0.06);
+    padding-top: 15px;
 }
 
 .sc-tl-dot {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.1);
-    border: 2px solid rgba(255, 255, 255, 0.06);
-    position: relative;
-    z-index: 1;
+    border: 1.5px solid rgba(255, 255, 255, 0.1);
+    background: #08090d;
     flex-shrink: 0;
 }
 
 .sc-tl-row.has-posts .sc-tl-dot {
-    background: var(--accent, #00c93a);
-    border-color: rgba(0, 150, 45, 0.3);
-    box-shadow: 0 0 8px rgba(0, 150, 45, 0.3);
+    border-color: #00c93a;
+    background: rgba(0, 201, 58, 0.2);
 }
 
 .sc-tl-content {
+    padding: 10px 16px;
     display: flex;
     flex-direction: column;
     gap: 6px;
-}
-
-.sc-tl-empty-slot {
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.15);
+    min-width: 0;
 }
 
 .sc-tl-card {
-    padding: 12px;
-    background: rgba(255, 255, 255, 0.025);
+    padding: 10px 14px;
+    background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.06);
-    border-left: 3px solid var(--ch, rgba(255, 255, 255, 0.1));
-    border-radius: 8px;
-    transition: all 0.15s ease;
-}
-
-.sc-tl-card:hover {
-    border-color: rgba(255, 255, 255, 0.1);
-    border-left-color: var(--ch, rgba(255, 255, 255, 0.2));
-    background: rgba(255, 255, 255, 0.04);
+    border-left: 2px solid var(--ch);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
 }
 
 .sc-tl-card-head {
     display: flex;
     align-items: center;
     gap: 8px;
-    margin-bottom: 6px;
 }
 
 .sc-tl-type {
-    font-size: 11px;
-    font-weight: 500;
-    color: rgba(255, 255, 255, 0.45);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: rgba(255, 255, 255, 0.22);
 }
 
 .sc-tl-card-text {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.7);
+    font-size: 12.5px;
+    color: rgba(255, 255, 255, 0.5);
     margin: 0;
-    line-height: 1.5;
+    line-height: 1.4;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
-/* ── Summary strip (backwards compat) ── */
-.sc-summary {
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    padding: 16px 22px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.07);
-    border-radius: 12px;
+.sc-tl-empty-slot {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.1);
+    padding: 2px 0;
 }
 
-.sc-sum-item {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.sc-sum-val {
-    font-size: 20px;
-    font-weight: 700;
-    color: #f5f5f5;
-}
-
-.sc-sum-label {
-    font-size: 11.5px;
-    color: rgba(255, 255, 255, 0.4);
-    font-weight: 500;
-}
-
-.sc-sum-divider {
-    width: 1px;
-    height: 28px;
-    background: rgba(255, 255, 255, 0.08);
-}
-
-/* ── Responsive ───────────────────────────── */
-
+/* ── Responsive ─────────────────────────── */
 @media (max-width: 900px) {
     .sc-head {
         flex-direction: column;
-    }
-
-    .sc-head-right {
-        width: 100%;
-        justify-content: space-between;
-    }
-
-    .sc-stats {
-        flex-wrap: wrap;
+        align-items: flex-start;
         gap: 12px;
     }
 
     .sc-cal-cell {
         min-height: 60px;
-        padding: 4px;
     }
 
     .sc-cal-text {
         display: none;
     }
-
-    .sc-tl-row {
-        grid-template-columns: 60px 20px 1fr;
-    }
 }
 
-@media (max-width: 600px) {
-    .sc-post {
-        flex-direction: column;
-        align-items: stretch;
+@media (max-width: 640px) {
+    .sc-stats {
+        flex-wrap: wrap;
+        gap: 14px;
+        padding: 14px;
+    }
+
+    .sc-stat-div {
+        display: none;
     }
 
     .sc-post-actions {
-        justify-content: flex-end;
+        flex-direction: column;
+    }
+
+    .sc-tl-row {
+        grid-template-columns: 64px 20px 1fr;
     }
 }
