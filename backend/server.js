@@ -34,9 +34,9 @@ const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const TELEGRAM_BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || 'FlowSyncAi_bot';
 const TWITTER_CLIENT_ID = process.env.TWITTER_CLIENT_ID;
 const TWITTER_CLIENT_SECRET = process.env.TWITTER_CLIENT_SECRET;
-const CALLBACK_URL = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}/api/twitter/callback`
-    : 'https://ai-automation-app.vercel.app/api/twitter/callback';
+const CALLBACK_URL = process.env.RENDER_EXTERNAL_URL
+    ? `${process.env.RENDER_EXTERNAL_URL}/api/twitter/callback`
+    : 'https://flowsync-3fd5.onrender.com/api/twitter/callback';
 
 /* ─────────────────────────────────────────────────────────
    Socket Auth Middleware — require userId on handshake
