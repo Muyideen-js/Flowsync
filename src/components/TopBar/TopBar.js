@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { io } from 'socket.io-client';
 import './TopBar.css';
 
-const SOCKET_URL = 'http://localhost:5000';
+const SOCKET_URL = 'https://flowsync-3fd5.onrender.com';
 
 /* ── Page title map ── */
 const PAGE_TITLES = {

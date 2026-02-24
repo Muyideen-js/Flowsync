@@ -160,7 +160,7 @@ const Inbox = () => {
         if (socketRef.current?.connected) return;
         if (socketRef.current) socketRef.current.disconnect();
 
-        const socket = io('http://localhost:5000', {
+        const socket = io('https://flowsync-3fd5.onrender.com', {
             auth: { userId: userData.uid },   // ← required by server auth middleware
             transports: ['websocket'],
             reconnectionAttempts: 10,

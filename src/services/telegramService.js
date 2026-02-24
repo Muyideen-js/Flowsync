@@ -1,7 +1,7 @@
 // Telegram Service - OAuth version
 import axios from 'axios';
 
-const BACKEND_URL = 'http://localhost:5000';
+const BACKEND_URL = 'https://flowsync-3fd5.onrender.com';
 
 class TelegramService {
     // Get OAuth authorization URL

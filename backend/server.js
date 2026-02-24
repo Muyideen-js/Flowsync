@@ -17,7 +17,7 @@ const PORT = process.env.PORT || 5000;
 const server = http.createServer(app);
 
 const io = new Server(server, {
-    cors: { origin: 'http://localhost:3000', methods: ['GET', 'POST'] }
+    cors: { origin: ['http://localhost:3000', 'https://flowsync-automation.netlify.app'], methods: ['GET', 'POST'] }
 });
 
 // Give registries a reference to io so they can use io.to(userId).emit()
@@ -239,7 +239,7 @@ app.get('/api/twitter/auth-url', (req, res) => {
 app.get('/api/twitter/callback', async (req, res) => {
     const { code, state } = req.query;
     const storedData = oauthStates.get(state);
-    if (!storedData) return res.redirect('http://localhost:3000/dashboard?error=invalid_state');
+    if (!storedData) return res.redirect('https://flowsync-automation.netlify.app/dashboard?error=invalid_state');
     try {
         const tokenRes = await axios.post(
             'https://api.twitter.com/2/oauth2/token',
@@ -250,9 +250,9 @@ app.get('/api/twitter/callback', async (req, res) => {
         const userRes = await axios.get('https://api.twitter.com/2/users/me', { headers: { Authorization: `Bearer ${access_token}` } });
         userTokens.set('twitter', { accessToken: access_token, refreshToken: refresh_token, username: userRes.data.data.username, userId: userRes.data.data.id, name: userRes.data.data.name });
         oauthStates.delete(state);
-        res.redirect('http://localhost:3000/dashboard?twitter=connected');
+        res.redirect('https://flowsync-automation.netlify.app/dashboard?twitter=connected');
     } catch (error) {
-        res.redirect('http://localhost:3000/dashboard?error=twitter_auth_failed');
+        res.redirect('https://flowsync-automation.netlify.app/dashboard?error=twitter_auth_failed');
     }
 });
 
