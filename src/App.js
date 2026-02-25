@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { SocketProvider } from './contexts/SocketContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Landing from './pages/Landing/Landing';
 import Login from './pages/Auth/Login';
@@ -20,33 +21,35 @@ function App() {
     return (
         <AuthProvider>
             <Router>
-                <Routes>
-                    {/* Public */}
-                    <Route path="/" element={<Landing />} />
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/signup" element={<Signup />} />
+                <SocketProvider>
+                    <Routes>
+                        {/* Public */}
+                        <Route path="/" element={<Landing />} />
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/signup" element={<Signup />} />
 
-                    {/* Protected */}
-                    <Route path="/dashboard" element={<ProtectedRoute><CommandCenter /></ProtectedRoute>} />
-                    <Route path="/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
-                    <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
-                    <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
-                    <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
-                    <Route path="/composer" element={<ProtectedRoute><Composer /></ProtectedRoute>} />
-                    <Route path="/scheduler" element={<ProtectedRoute><Scheduling /></ProtectedRoute>} />
-                    <Route path="/scheduling" element={<ProtectedRoute><Scheduling /></ProtectedRoute>} />
-                    <Route path="/logs" element={<ProtectedRoute><Logs /></ProtectedRoute>} />
-                    <Route path="/developer" element={<ProtectedRoute><Developer /></ProtectedRoute>} />
+                        {/* Protected */}
+                        <Route path="/dashboard" element={<ProtectedRoute><CommandCenter /></ProtectedRoute>} />
+                        <Route path="/accounts" element={<ProtectedRoute><Accounts /></ProtectedRoute>} />
+                        <Route path="/inbox" element={<ProtectedRoute><Inbox /></ProtectedRoute>} />
+                        <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
+                        <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
+                        <Route path="/composer" element={<ProtectedRoute><Composer /></ProtectedRoute>} />
+                        <Route path="/scheduler" element={<ProtectedRoute><Scheduling /></ProtectedRoute>} />
+                        <Route path="/scheduling" element={<ProtectedRoute><Scheduling /></ProtectedRoute>} />
+                        <Route path="/logs" element={<ProtectedRoute><Logs /></ProtectedRoute>} />
+                        <Route path="/developer" element={<ProtectedRoute><Developer /></ProtectedRoute>} />
 
-                    {/* Legacy / old routes → redirects */}
-                    <Route path="/old-dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-                    <Route path="/mentions" element={<Navigate to="/inbox" replace />} />
-                    <Route path="/automation" element={<Navigate to="/dashboard" replace />} />
-                    <Route path="/broadcasts" element={<Navigate to="/dashboard" replace />} />
-                    <Route path="/templates" element={<Navigate to="/composer" replace />} />
+                        {/* Legacy / old routes → redirects */}
+                        <Route path="/old-dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                        <Route path="/mentions" element={<Navigate to="/inbox" replace />} />
+                        <Route path="/automation" element={<Navigate to="/dashboard" replace />} />
+                        <Route path="/broadcasts" element={<Navigate to="/dashboard" replace />} />
+                        <Route path="/templates" element={<Navigate to="/composer" replace />} />
 
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                    </Routes>
+                </SocketProvider>
             </Router>
         </AuthProvider>
     );

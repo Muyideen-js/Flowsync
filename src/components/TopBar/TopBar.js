@@ -1,10 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { io } from 'socket.io-client';
+import { useSocket } from '../../contexts/SocketContext';
 import './TopBar.css';
-
-const SOCKET_URL = 'https://flowsync-3fd5.onrender.com';
 
 /* ── Page title map ── */
 const PAGE_TITLES = {
@@ -109,63 +107,47 @@ const TopBar = () => {
         });
     }, []);
 
-    /* ── Socket connection for real-time notifications ── */
+    /* ── Listen for notifications on the shared socket ── */
+    const { socket: sharedSocket } = useSocket() || {};
     useEffect(() => {
-        if (!user?.uid) return;
+        if (!sharedSocket) return;
 
-        const socket = io(SOCKET_URL, {
-            auth: { userId: user.uid },
-            transports: ['websocket'],
-            reconnectionAttempts: 5,
-        });
-        socketRef.current = socket;
-
-        /* WhatsApp events */
-        socket.on('wa_message', ({ from, body }) => {
-            addNotif({
-                type: 'whatsapp',
-                text: `New WA message from ${from?.split('@')[0] || 'contact'}`,
-                sub: body?.slice(0, 60) || '',
-            });
-        });
-
-        socket.on('wa_state', ({ state }) => {
-            if (state === 'connected') {
-                addNotif({ type: 'whatsapp', text: 'WhatsApp connected successfully' });
-            } else if (state === 'disconnected') {
-                addNotif({ type: 'system', text: 'WhatsApp disconnected' });
-            }
-        });
-
-        /* Telegram events */
-        socket.on('tg_message', ({ from, text }) => {
-            addNotif({
-                type: 'telegram',
-                text: `Telegram message from ${from || 'contact'}`,
-                sub: text?.slice(0, 60) || '',
-            });
-        });
-
-        socket.on('tg_state', ({ state }) => {
-            if (state === 'running') {
-                addNotif({ type: 'telegram', text: 'Telegram bot connected' });
-            }
-        });
-
-        /* Automation / system events */
-        socket.on('automation_triggered', ({ name }) => {
+        const onWaMessage = ({ from, body }) => {
+            addNotif({ type: 'whatsapp', text: `New WA message from ${from?.split('@')[0] || 'contact'}`, sub: body?.slice(0, 60) || '' });
+        };
+        const onWaState = ({ state }) => {
+            if (state === 'ready') addNotif({ type: 'whatsapp', text: 'WhatsApp connected successfully' });
+            else if (state === 'idle') addNotif({ type: 'system', text: 'WhatsApp disconnected' });
+        };
+        const onTgMessage = ({ from, text }) => {
+            addNotif({ type: 'telegram', text: `Telegram message from ${from || 'contact'}`, sub: text?.slice(0, 60) || '' });
+        };
+        const onTgState = ({ state }) => {
+            if (state === 'ready') addNotif({ type: 'telegram', text: 'Telegram bot connected' });
+        };
+        const onAutoTrigger = ({ name }) => {
             addNotif({ type: 'system', text: `Automation "${name}" triggered` });
-        });
-
-        socket.on('post_published', ({ platform, type }) => {
+        };
+        const onPostPub = ({ platform, type }) => {
             addNotif({ type: platform || 'system', text: `${type || 'Post'} published to ${platform}` });
-        });
+        };
+
+        sharedSocket.on('wa_message', onWaMessage);
+        sharedSocket.on('wa_state', onWaState);
+        sharedSocket.on('tg_message', onTgMessage);
+        sharedSocket.on('tg_state', onTgState);
+        sharedSocket.on('automation_triggered', onAutoTrigger);
+        sharedSocket.on('post_published', onPostPub);
 
         return () => {
-            socket.disconnect();
-            socketRef.current = null;
+            sharedSocket.off('wa_message', onWaMessage);
+            sharedSocket.off('wa_state', onWaState);
+            sharedSocket.off('tg_message', onTgMessage);
+            sharedSocket.off('tg_state', onTgState);
+            sharedSocket.off('automation_triggered', onAutoTrigger);
+            sharedSocket.off('post_published', onPostPub);
         };
-    }, [user?.uid, addNotif]);
+    }, [sharedSocket, addNotif]);
 
     /* ── Tick timestamps every 30s ── */
     useEffect(() => {

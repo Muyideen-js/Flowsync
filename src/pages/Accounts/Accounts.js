@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import MainLayout from '../../components/Layout/MainLayout';
 import { useAuth } from '../../contexts/AuthContext';
-import { io } from 'socket.io-client';
+import { useSocket } from '../../contexts/SocketContext';
 import './Accounts.css';
-
-const SOCKET_URL = 'https://flowsync-3fd5.onrender.com';
 
 /**
  * WhatsApp UI State Machine
@@ -135,69 +133,51 @@ const Accounts = () => {
         if (ca.telegram?.botToken) setTgBotToken(ca.telegram.botToken);
     }, [userData]);
 
-    /* ── Persistent socket — created once user is known ─── */
+    /* ── Use shared socket from SocketContext ─── */
+    const { socket: sharedSocket, connected: socketConnected } = useSocket() || {};
     useEffect(() => {
-        // Wait until we have userData (Firebase UID)
-        if (!userData?.uid) return;
+        if (!sharedSocket || !userData?.uid) return;
         userIdRef.current = userData.uid;
+        socketRef.current = sharedSocket;
 
-        // Avoid recreating if already connected for same user
-        if (socketRef.current?.connected) return;
-        if (socketRef.current) socketRef.current.disconnect();
-
-        const socket = io(SOCKET_URL, {
-            auth: { userId: userData.uid },   // ← private room key
-            transports: ['websocket'],
-            reconnectionAttempts: 10,
-            reconnectionDelay: 1500,
-            timeout: 10000,
-        });
-        socketRef.current = socket;
-
-        socket.on('connect', () => {
-            console.log('[Accounts] Socket connected for user:', userData.uid.substring(0, 8));
-            socket.emit('get_whatsapp_status');
-            socket.emit('start_whatsapp');
-            // Auto-reconnect Telegram bot from saved Firestore token ONLY if not explicitly disconnected
+        // On mount (or reconnect), sync state
+        if (sharedSocket.connected) {
+            console.log('[Accounts] Using shared socket for user:', userData.uid.substring(0, 8));
+            sharedSocket.emit('get_whatsapp_status');
+            sharedSocket.emit('start_whatsapp');
             if (!tgExplicitDisconnect.current) {
                 const savedToken = userData.connectedAccounts?.telegram?.botToken;
                 if (savedToken) {
-                    socket.emit('connect_telegram_bot', { botToken: savedToken });
+                    sharedSocket.emit('connect_telegram_bot', { botToken: savedToken });
                 }
             }
-        });
+        }
 
         /* ─── Telegram state events ─── */
-        socket.on('tg_connected', (data) => {
+        const onTgConnected = (data) => {
             const handle = data.username ? `@${data.username}` : 'Bot connected';
             setConnections(prev => ({ ...prev, telegram: { connected: true, handle, lastSync: 'Just now' } }));
-        });
-
-        socket.on('tg_state', ({ state }) => {
-            // Always reflect actual bot state — idle/error means disconnected
+        };
+        const onTgState = ({ state }) => {
             if (state === 'idle' || state === 'error') {
                 setConnections(prev => ({ ...prev, telegram: { connected: false, handle: null, lastSync: null } }));
             }
-        });
-
-        socket.on('connect_error', (err) => {
+        };
+        const onConnectError = (err) => {
             console.error('[Accounts] Socket error:', err.message);
             setWaState(prev => prev === 'checking' ? 'idle' : prev);
-        });
-
-        socket.on('tg_error', ({ error }) => {
+        };
+        const onTgError = ({ error }) => {
             console.error('[Accounts] Telegram error:', error);
-            // Show an inline error — alert used since Accounts has no toast system
             const msg = error?.includes('404') || error?.includes('401')
-                ? '❌ Invalid bot token. Copy the token exactly from @BotFather and try again.'
-                : `❌ Telegram error: ${error}`;
+                ? 'Invalid bot token. Copy the token exactly from @BotFather and try again.'
+                : `Telegram error: ${error}`;
             alert(msg);
-        });
+        };
 
         /* ─── WhatsApp state events ─── */
-        socket.on('wa_state', ({ state }) => {
+        const onWaState = ({ state }) => {
             setWaState(state);
-            // Only auto-open modal if the USER explicitly clicked the button
             if (state === 'qr' && userOpenedModal.current) setQrModal(true);
             if (state === 'ready') {
                 setQrModal(false);
@@ -209,65 +189,75 @@ const Accounts = () => {
             }
             if (state === 'idle' || state === 'error') {
                 setQrCode('');
-                // Only close modal if user had it open
                 if (userOpenedModal.current) setQrModal(false);
                 userOpenedModal.current = false;
             }
-        });
-
-        socket.on('qr_code', (qr) => {
+        };
+        const onQrCode = (qr) => {
             setQrCode(qr);
             setWaState('qr');
-            // Only open modal if user wanted it
             if (userOpenedModal.current) setQrModal(true);
-        });
-
-        socket.on('whatsapp_ready', () => {
+        };
+        const onWaReady = () => {
             setWaState('ready');
             setQrModal(false);
             setQrCode('');
             updateUserData({
                 'connectedAccounts.whatsapp': { connected: true, connectedAt: new Date().toISOString() }
             });
-        });
-
-        socket.on('whatsapp_authenticated', () => {
+        };
+        const onWaAuth = () => {
             setWaState(prev => prev === 'ready' ? 'ready' : 'authenticated');
-        });
-
-        socket.on('whatsapp_disconnected', () => {
+        };
+        const onWaDisconnected = () => {
             setWaState('idle');
             setQrModal(false);
             setQrCode('');
             updateUserData({ 'connectedAccounts.whatsapp': { connected: false, connectedAt: null } });
-        });
-
-        socket.on('whatsapp_auth_failure', () => {
-            setWaState('error');
-        });
-
-        socket.on('whatsapp_status', ({ ready }) => {
-            if (ready) setWaState('ready');
-        });
-
-        /* ─── Telegram events ─── */
-        socket.on('telegram_connected', (data) => {
+        };
+        const onWaAuthFail = () => { setWaState('error'); };
+        const onWaStatus = ({ ready }) => { if (ready) setWaState('ready'); };
+        const onTgConnectedLegacy = (data) => {
             const handle = data.username ? `@${data.username}` : 'Connected Bot';
             setConnections(prev => ({ ...prev, telegram: { connected: true, handle, lastSync: 'Just now' } }));
             updateUserData({ 'connectedAccounts.telegram': { connected: true, connectedAt: new Date().toISOString() } });
-        });
-
-        socket.on('telegram_connect_error', (data) => {
+        };
+        const onTgConnectError = (data) => {
             console.error('[Accounts] TG error:', data?.error);
             alert(`Telegram connection failed: ${data?.error || 'Unknown error'}`);
-        });
+        };
+
+        sharedSocket.on('tg_connected', onTgConnected);
+        sharedSocket.on('tg_state', onTgState);
+        sharedSocket.on('connect_error', onConnectError);
+        sharedSocket.on('tg_error', onTgError);
+        sharedSocket.on('wa_state', onWaState);
+        sharedSocket.on('qr_code', onQrCode);
+        sharedSocket.on('whatsapp_ready', onWaReady);
+        sharedSocket.on('whatsapp_authenticated', onWaAuth);
+        sharedSocket.on('whatsapp_disconnected', onWaDisconnected);
+        sharedSocket.on('whatsapp_auth_failure', onWaAuthFail);
+        sharedSocket.on('whatsapp_status', onWaStatus);
+        sharedSocket.on('telegram_connected', onTgConnectedLegacy);
+        sharedSocket.on('telegram_connect_error', onTgConnectError);
 
         return () => {
-            socket.disconnect();
-            socketRef.current = null;
+            sharedSocket.off('tg_connected', onTgConnected);
+            sharedSocket.off('tg_state', onTgState);
+            sharedSocket.off('connect_error', onConnectError);
+            sharedSocket.off('tg_error', onTgError);
+            sharedSocket.off('wa_state', onWaState);
+            sharedSocket.off('qr_code', onQrCode);
+            sharedSocket.off('whatsapp_ready', onWaReady);
+            sharedSocket.off('whatsapp_authenticated', onWaAuth);
+            sharedSocket.off('whatsapp_disconnected', onWaDisconnected);
+            sharedSocket.off('whatsapp_auth_failure', onWaAuthFail);
+            sharedSocket.off('whatsapp_status', onWaStatus);
+            sharedSocket.off('telegram_connected', onTgConnectedLegacy);
+            sharedSocket.off('telegram_connect_error', onTgConnectError);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [userData?.uid]);
+    }, [sharedSocket, socketConnected, userData?.uid]);
 
     /* ── Handlers ─────────────────────────────────────────── */
     const handleConnectWA = useCallback(() => {
