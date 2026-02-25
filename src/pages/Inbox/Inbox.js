@@ -160,24 +160,12 @@ const Inbox = () => {
         if (!sharedSocket || !userData?.uid) return;
         socketRef.current = sharedSocket;
 
-        // On mount (or reconnect), request data
-        if (sharedSocket.connected) {
-            console.log('[Inbox] Using shared socket for user:', userData.uid.substring(0, 8));
-            setFetchState(prev => (prev === 'idle' || prev === 'not_connected') ? 'connecting' : prev);
-            sharedSocket.emit('get_telegram_messages');
-            setThreads(prev => {
-                const hasWAThreads = prev.some(t => t.platform === 'whatsapp');
-                if (!hasWAThreads) didFetchRef.current = false;
-                return prev;
-            });
-        }
-
+        /* ─── Define + register ALL listeners FIRST ─── */
         const onConnectError = (err) => {
             console.error('[Inbox] Socket connect error:', err.message);
             setFetchState(prev => (prev === 'loading' || prev === 'connecting') ? 'error' : prev);
         };
 
-        /* ── wa_state is the single source of truth ── */
         const onWaState = ({ state }) => {
             if (state === 'ready') {
                 setWaReady(true);
@@ -325,6 +313,7 @@ const Inbox = () => {
         };
         const onWaDisconnected = () => { setWaReady(false); };
 
+        /* ─── Register listeners ─── */
         sharedSocket.on('connect_error', onConnectError);
         sharedSocket.on('wa_state', onWaState);
         sharedSocket.on('whatsapp_status', onWaStatus);
@@ -338,6 +327,19 @@ const Inbox = () => {
         sharedSocket.on('whatsapp_ready', onWaReady);
         sharedSocket.on('whatsapp_chats_error', onChatsError);
         sharedSocket.on('whatsapp_disconnected', onWaDisconnected);
+
+        /* ─── NOW emit requests (listeners are ready) ─── */
+        if (sharedSocket.connected) {
+            console.log('[Inbox] Using shared socket for user:', userData.uid.substring(0, 8));
+            setFetchState(prev => (prev === 'idle' || prev === 'not_connected') ? 'connecting' : prev);
+            sharedSocket.emit('get_telegram_messages');
+            sharedSocket.emit('get_whatsapp_status');
+            setThreads(prev => {
+                const hasWAThreads = prev.some(t => t.platform === 'whatsapp');
+                if (!hasWAThreads) didFetchRef.current = false;
+                return prev;
+            });
+        }
 
         return () => {
             clearTimeout(fetchTimeoutRef.current);

@@ -141,33 +141,21 @@ const Accounts = () => {
         userIdRef.current = userData.uid;
         socketRef.current = sharedSocket;
 
-        // On mount (or reconnect), sync state
-        if (sharedSocket.connected) {
-            console.log('[Accounts] Using shared socket for user:', userData.uid.substring(0, 8));
-            sharedSocket.emit('get_whatsapp_status');
-            sharedSocket.emit('start_whatsapp');
-            sharedSocket.emit('get_telegram_status');
-            if (!tgExplicitDisconnect.current) {
-                const savedToken = userData.connectedAccounts?.telegram?.botToken;
-                if (savedToken) {
-                    sharedSocket.emit('connect_telegram_bot', { botToken: savedToken });
-                }
-            }
-            // Check Twitter status via REST API
-            twitterService.checkStatus().then(res => {
-                if (res.connected) {
-                    setConnections(prev => ({ ...prev, twitter: { connected: true, handle: `@${res.data?.username || 'connected'}`, lastSync: 'Synced' } }));
-                }
-            }).catch(() => { });
-        }
-
-        /* ─── Telegram state events ─── */
+        /* ─── Define ALL listeners FIRST ─── */
         const onTgConnected = (data) => {
             const handle = data.username ? `@${data.username}` : 'Bot connected';
             setConnections(prev => ({ ...prev, telegram: { connected: true, handle, lastSync: 'Just now' } }));
         };
         const onTgState = ({ state }) => {
-            if (state === 'idle' || state === 'error') {
+            if (state === 'ready') {
+                // Telegram is connected — request fresh info
+                setConnections(prev => {
+                    if (!prev.telegram.connected) {
+                        return { ...prev, telegram: { connected: true, handle: prev.telegram.handle || 'Bot connected', lastSync: 'Synced' } };
+                    }
+                    return prev;
+                });
+            } else if (state === 'idle' || state === 'error') {
                 setConnections(prev => ({ ...prev, telegram: { connected: false, handle: null, lastSync: null } }));
             }
         };
@@ -182,8 +170,6 @@ const Accounts = () => {
                 : `Telegram error: ${error}`;
             alert(msg);
         };
-
-        /* ─── WhatsApp state events ─── */
         const onWaState = ({ state }) => {
             setWaState(state);
             if (state === 'qr' && userOpenedModal.current) setQrModal(true);
@@ -235,6 +221,7 @@ const Accounts = () => {
             alert(`Telegram connection failed: ${data?.error || 'Unknown error'}`);
         };
 
+        /* ─── Register listeners BEFORE emitting ─── */
         sharedSocket.on('tg_connected', onTgConnected);
         sharedSocket.on('tg_state', onTgState);
         sharedSocket.on('connect_error', onConnectError);
@@ -248,6 +235,24 @@ const Accounts = () => {
         sharedSocket.on('whatsapp_status', onWaStatus);
         sharedSocket.on('telegram_connected', onTgConnectedLegacy);
         sharedSocket.on('telegram_connect_error', onTgConnectError);
+
+        /* ─── NOW emit status requests (listeners are ready) ─── */
+        if (sharedSocket.connected) {
+            console.log('[Accounts] Using shared socket for user:', userData.uid.substring(0, 8));
+            sharedSocket.emit('get_whatsapp_status');
+            sharedSocket.emit('get_telegram_status');
+            if (!tgExplicitDisconnect.current) {
+                const savedToken = userData.connectedAccounts?.telegram?.botToken;
+                if (savedToken) {
+                    sharedSocket.emit('connect_telegram_bot', { botToken: savedToken });
+                }
+            }
+            twitterService.checkStatus().then(res => {
+                if (res.connected) {
+                    setConnections(prev => ({ ...prev, twitter: { connected: true, handle: `@${res.data?.username || 'connected'}`, lastSync: 'Synced' } }));
+                }
+            }).catch(() => { });
+        }
 
         return () => {
             sharedSocket.off('tg_connected', onTgConnected);

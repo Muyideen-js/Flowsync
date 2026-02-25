@@ -52,7 +52,7 @@ const Landing = () => {
                 <div className="hero-container">
 
                     <h1 className="hero-h1">
-                        Automate Social Media<br />
+                        !Automate Social Media<br />
                         with{' '}
                         <RotatingText
                             texts={['AI', 'Automation', 'Intelligence', 'FlowSync']}
