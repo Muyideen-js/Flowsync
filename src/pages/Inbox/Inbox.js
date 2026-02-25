@@ -155,63 +155,33 @@ const Inbox = () => {
     }, []);
 
     /* ── Use shared socket from SocketContext ─────────────── */
-    const { socket: sharedSocket, connected: socketConnected } = useSocket() || {};
+    const { socket: sharedSocket, connected: socketConnected, connectionStates } = useSocket() || {};
     useEffect(() => {
         if (!sharedSocket || !userData?.uid) return;
         socketRef.current = sharedSocket;
 
-        /* ─── Define + register ALL listeners FIRST ─── */
+        /* ─── Define listeners ─── */
         const onConnectError = (err) => {
             console.error('[Inbox] Socket connect error:', err.message);
             setFetchState(prev => (prev === 'loading' || prev === 'connecting') ? 'error' : prev);
         };
 
-        const onWaState = ({ state }) => {
-            if (state === 'ready') {
-                setWaReady(true);
-                setThreads(prev => {
-                    const hasWAThreads = prev.some(t => t.platform === 'whatsapp');
-                    if (!didFetchRef.current || !hasWAThreads) {
-                        setFetchState('loading');
-                        setFetchProgress({ current: 0, total: 0, message: 'Fetching chats…' });
-                        sharedSocket.emit('get_whatsapp_chats');
-                        startFetchTimeout();
-                        didFetchRef.current = true;
-                    }
-                    return prev;
-                });
-            } else if (state === 'idle' || state === 'error') {
-                setWaReady(false);
-                setTimeout(() => {
-                    setFetchState(prev => {
-                        if (prev === 'loading' || prev === 'done') return prev;
-                        return 'not_connected';
-                    });
-                }, 2000);
-            } else {
-                setFetchState(prev =>
-                    (prev === 'idle' || prev === 'not_connected') ? 'connecting' : prev
-                );
-            }
+        // Unified inbox threads from Firestore
+        const onInboxThreads = (allThreads) => {
+            clearTimeout(fetchTimeoutRef.current);
+            console.log('[Inbox] Received threads from Firestore:', allThreads.length);
+            setThreads(prev => {
+                const merged = allThreads.sort((a, b) => (b.unread ? 1 : 0) - (a.unread ? 1 : 0));
+                saveCache(merged);
+                return merged;
+            });
+            setFetchState('done');
+            didFetchRef.current = true;
         };
 
-        const onWaStatus = ({ ready }) => {
-            if (ready && !didFetchRef.current) {
-                setWaReady(true);
-                setFetchState('loading');
-                sharedSocket.emit('get_whatsapp_chats');
-                startFetchTimeout();
-            }
-        };
-
-        const onLoadingProgress = (data) => {
-            setFetchState('loading');
-            setFetchProgress(data);
-        };
-
+        // Legacy: WA chats
         const onWaChats = (chats) => {
             clearTimeout(fetchTimeoutRef.current);
-            console.log('[Inbox] Received WA chats:', chats.length);
             setThreads(prev => {
                 const others = prev.filter(t => t.platform !== 'whatsapp');
                 const merged = [...chats, ...others].sort((a, b) => (b.unread ? 1 : 0) - (a.unread ? 1 : 0));
@@ -222,6 +192,7 @@ const Inbox = () => {
             didFetchRef.current = true;
         };
 
+        // Legacy: TG threads
         const onTgThreads = (tgThreads) => {
             console.log('[Inbox] Received TG threads:', tgThreads.length);
             setThreads(prev => {
@@ -235,6 +206,7 @@ const Inbox = () => {
             );
         };
 
+        // Live incoming messages
         const onWaMessage = (msg) => {
             setThreads(prev => {
                 const idx = prev.findIndex(t => t.id === msg.chatId);
@@ -288,74 +260,37 @@ const Inbox = () => {
             setSendError(error || 'Failed to send message');
             setTimeout(() => setSendError(''), 4000);
         };
-        const onWaReady = () => {
-            console.log('[Inbox] WhatsApp ready');
-            setWaReady(true);
-            if (!didFetchRef.current) {
-                setFetchState('loading');
-                sharedSocket.emit('get_whatsapp_chats');
-                startFetchTimeout();
-            }
-        };
-        const onChatsError = (err) => {
-            console.warn('[Inbox] Chat fetch error:', err);
-            clearTimeout(fetchTimeoutRef.current);
-            if (err.reason === 'not_ready') {
-                setWaReady(false);
-                if (threads.filter(t => t.platform === 'whatsapp').length === 0) {
-                    setFetchState('not_connected');
-                }
-            } else if (err.reason === 'session_stale') {
-                setFetchProgress({ current: 0, total: 0, message: 'Session stale, reconnecting...' });
-            } else if (threads.length === 0) {
-                setFetchState('error');
-            }
-        };
-        const onWaDisconnected = () => { setWaReady(false); };
 
         /* ─── Register listeners ─── */
         sharedSocket.on('connect_error', onConnectError);
-        sharedSocket.on('wa_state', onWaState);
-        sharedSocket.on('whatsapp_status', onWaStatus);
-        sharedSocket.on('whatsapp_loading_progress', onLoadingProgress);
+        sharedSocket.on('inbox_threads', onInboxThreads);
         sharedSocket.on('whatsapp_chats', onWaChats);
         sharedSocket.on('telegram_threads', onTgThreads);
         sharedSocket.on('whatsapp_message', onWaMessage);
         sharedSocket.on('telegram_incoming_message', onTgMessage);
         sharedSocket.on('send_message_ok', onSendOk);
         sharedSocket.on('send_message_error', onSendErr);
-        sharedSocket.on('whatsapp_ready', onWaReady);
-        sharedSocket.on('whatsapp_chats_error', onChatsError);
-        sharedSocket.on('whatsapp_disconnected', onWaDisconnected);
 
-        /* ─── NOW emit requests (listeners are ready) ─── */
+        /* ─── Fetch threads from Firestore (fast, single request) ─── */
         if (sharedSocket.connected) {
-            console.log('[Inbox] Using shared socket for user:', userData.uid.substring(0, 8));
-            setFetchState(prev => (prev === 'idle' || prev === 'not_connected') ? 'connecting' : prev);
+            console.log('[Inbox] Fetching inbox from Firestore for:', userData.uid.substring(0, 8));
+            setFetchState(prev => (prev === 'idle' || prev === 'not_connected') ? 'loading' : prev);
+            sharedSocket.emit('get_inbox');
+            // Also request Telegram threads (polling may have new ones)
             sharedSocket.emit('get_telegram_messages');
-            sharedSocket.emit('get_whatsapp_status');
-            setThreads(prev => {
-                const hasWAThreads = prev.some(t => t.platform === 'whatsapp');
-                if (!hasWAThreads) didFetchRef.current = false;
-                return prev;
-            });
+            startFetchTimeout();
         }
 
         return () => {
             clearTimeout(fetchTimeoutRef.current);
             sharedSocket.off('connect_error', onConnectError);
-            sharedSocket.off('wa_state', onWaState);
-            sharedSocket.off('whatsapp_status', onWaStatus);
-            sharedSocket.off('whatsapp_loading_progress', onLoadingProgress);
+            sharedSocket.off('inbox_threads', onInboxThreads);
             sharedSocket.off('whatsapp_chats', onWaChats);
             sharedSocket.off('telegram_threads', onTgThreads);
             sharedSocket.off('whatsapp_message', onWaMessage);
             sharedSocket.off('telegram_incoming_message', onTgMessage);
             sharedSocket.off('send_message_ok', onSendOk);
             sharedSocket.off('send_message_error', onSendErr);
-            sharedSocket.off('whatsapp_ready', onWaReady);
-            sharedSocket.off('whatsapp_chats_error', onChatsError);
-            sharedSocket.off('whatsapp_disconnected', onWaDisconnected);
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sharedSocket, socketConnected, userData?.uid]);
@@ -383,13 +318,10 @@ const Inbox = () => {
         setFetchState('loading');
         setFetchProgress({ current: 0, total: 0, message: 'Retrying…' });
         if (socketRef.current?.connected) {
-            // Fetch chats directly if WA is ready, otherwise request status
-            if (waReady) {
-                socketRef.current.emit('get_whatsapp_chats');
-            }
+            socketRef.current.emit('get_inbox');
             socketRef.current.emit('get_telegram_messages');
         }
-    }, [waReady]);
+    }, []);
 
     /* ── Select thread → generate context-aware AI ─────────────────────────── */
     const selectThread = useCallback((id) => {

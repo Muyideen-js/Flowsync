@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../../components/Navbar/Navbar';
 import Button from '../../components/Button/Button';
+import TargetCursor from '../../components/TargetCursor/TargetCursor';
 import RotatingText from '../../components/RotatingText/RotatingText';
 import {
     RiTwitterXFill, RiTelegramFill, RiInstagramFill, RiWhatsappFill,
@@ -72,6 +73,12 @@ const Landing = () => {
 
     return (
         <div className="landing">
+            <TargetCursor
+                spinDuration={2}
+                hideDefaultCursor
+                parallaxOn
+                hoverDuration={0.2}
+            />
             <Navbar transparent />
 
             {/* Hero Section */}

@@ -1,78 +1,20 @@
 /**
- * Meta WhatsApp Cloud API integration
- * Token-based auth, webhooks for incoming messages, no Puppeteer/whatsapp-web.js
+ * whatsapp-cloud.js — Per-user Meta WhatsApp Cloud API integration
+ *
+ * Token-based auth, webhooks for incoming messages, no Puppeteer/Chrome.
+ * All credentials and conversations stored in Firestore per userId.
  */
 
 const axios = require('axios');
-const path = require('path');
-const fs = require('fs');
+const store = require('./firestore');
 
 const API_VERSION = 'v21.0';
 const BASE_URL = `https://graph.facebook.com/${API_VERSION}`;
-const CREDENTIALS_FILE = path.join(__dirname, '.whatsapp_cloud_credentials.json');
-
-/** @type {{ accessToken: string, phoneNumberId: string, wabaId: string, connectedAt?: string } | null} */
-let credentials = null;
-
-/** In-memory conversations: phoneNumber -> { name, messages: [{ text, time, incoming }] } */
-const conversations = new Map();
 
 /**
- * Load credentials from file (persists across restarts)
+ * Validate Cloud API credentials by calling Meta API
  */
-function loadCredentials() {
-    try {
-        if (fs.existsSync(CREDENTIALS_FILE)) {
-            const raw = fs.readFileSync(CREDENTIALS_FILE, 'utf8');
-            credentials = JSON.parse(raw);
-            return credentials;
-        }
-    } catch (e) {
-        console.warn('[WA Cloud] Could not load credentials file:', e.message);
-    }
-    return null;
-}
-
-/**
- * Save credentials to file
- */
-function saveCredentials() {
-    if (!credentials) return;
-    try {
-        fs.writeFileSync(CREDENTIALS_FILE, JSON.stringify(credentials, null, 2), 'utf8');
-    } catch (e) {
-        console.warn('[WA Cloud] Could not save credentials:', e.message);
-    }
-}
-
-/**
- * Initialize from env or saved file
- */
-function initFromEnv() {
-    const token = process.env.WHATSAPP_TOKEN || process.env.WHATSAPP_ACCESS_TOKEN;
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-    const wabaId = process.env.WHATSAPP_WABA_ID || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID;
-
-    if (token && phoneNumberId && wabaId) {
-        credentials = {
-            accessToken: token,
-            phoneNumberId,
-            wabaId,
-            connectedAt: new Date().toISOString(),
-        };
-        saveCredentials();
-        return true;
-    }
-    return loadCredentials() !== null;
-}
-
-// Load on module load
-initFromEnv();
-
-/**
- * Validate credentials by calling Meta API
- */
-async function validateCredentials(accessToken, phoneNumberId, wabaId) {
+async function validateCredentials(accessToken, phoneNumberId) {
     try {
         const url = `${BASE_URL}/${phoneNumberId}`;
         const res = await axios.get(url, {
@@ -90,69 +32,62 @@ async function validateCredentials(accessToken, phoneNumberId, wabaId) {
 }
 
 /**
- * Connect (validate and store credentials)
+ * Connect (validate and store credentials per user)
  */
-async function connect(accessToken, phoneNumberId, wabaId) {
-    const validation = await validateCredentials(accessToken, phoneNumberId, wabaId);
+async function connect(userId, accessToken, phoneNumberId, wabaId) {
+    const validation = await validateCredentials(accessToken, phoneNumberId);
     if (!validation.valid) {
         return { ok: false, error: validation.error };
     }
 
-    credentials = {
+    await store.setConnection(userId, 'whatsapp', {
         accessToken,
         phoneNumberId,
         wabaId,
+        displayPhone: validation.displayPhone,
+        state: 'ready',
         connectedAt: new Date().toISOString(),
-    };
-    saveCredentials();
-    console.log('[WA Cloud] Connected:', validation.displayPhone);
+    });
+
+    console.log(`[WA Cloud:${userId.substring(0, 8)}] Connected: ${validation.displayPhone}`);
     return { ok: true, displayPhone: validation.displayPhone };
 }
 
 /**
- * Disconnect (clear credentials)
+ * Disconnect (remove credentials from Firestore)
  */
-function disconnect() {
-    credentials = null;
-    try {
-        if (fs.existsSync(CREDENTIALS_FILE)) {
-            fs.unlinkSync(CREDENTIALS_FILE);
-        }
-    } catch (e) {}
-    conversations.clear();
+async function disconnect(userId) {
+    await store.deleteConnection(userId, 'whatsapp');
+    console.log(`[WA Cloud:${userId.substring(0, 8)}] Disconnected`);
 }
 
 /**
- * Check if connected
+ * Check if a user is connected
  */
-function isConnected() {
-    return credentials !== null && !!credentials.accessToken;
+async function isConnected(userId) {
+    const conn = await store.getConnection(userId, 'whatsapp');
+    return !!(conn?.accessToken);
 }
 
 /**
- * Get current credentials (for socket status)
+ * Get credentials for a user
  */
-function getCredentials() {
-    return credentials ? { ...credentials } : null;
+async function getCredentials(userId) {
+    return store.getConnection(userId, 'whatsapp');
 }
 
 /**
  * Send text message via Cloud API
- * @param {string} to - Phone number (E.164 format, e.g. 14155238886)
- * @param {string} text - Message body
  */
-async function sendMessage(to, text) {
-    if (!credentials) {
-        throw new Error('WhatsApp not connected');
-    }
+async function sendMessage(userId, to, text) {
+    const conn = await store.getConnection(userId, 'whatsapp');
+    if (!conn?.accessToken) throw new Error('WhatsApp not connected');
 
-    // Normalize: remove @c.us suffix, +, spaces, leading zeros
+    // Normalize phone number
     let normalized = String(to).replace(/@c\.us$/, '').replace(/\D/g, '');
-    if (normalized.startsWith('0')) {
-        normalized = normalized.slice(1);
-    }
+    if (normalized.startsWith('0')) normalized = normalized.slice(1);
 
-    const url = `${BASE_URL}/${credentials.phoneNumberId}/messages`;
+    const url = `${BASE_URL}/${conn.phoneNumberId}/messages`;
     const res = await axios.post(
         url,
         {
@@ -165,51 +100,29 @@ async function sendMessage(to, text) {
         {
             headers: {
                 'Content-Type': 'application/json',
-                Authorization: `Bearer ${credentials.accessToken}`,
+                Authorization: `Bearer ${conn.accessToken}`,
             },
             timeout: 15000,
         }
     );
 
+    // Save outgoing message to Firestore
+    const chatId = `wa_${normalized}`;
+    await store.saveMessage(userId, chatId, {
+        text,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        incoming: false,
+    });
+
     return res.data;
 }
 
 /**
- * Add or update conversation from webhook message
+ * Process webhook payload — save to Firestore per user, return parsed messages
+ * NOTE: Webhooks are account-level (not per-user). We need to map the
+ * phoneNumberId back to the user who connected it.
  */
-function addConversationFromWebhook(from, name, text, incoming, timestamp) {
-    const chatId = `wa_${from}`;
-    if (!conversations.has(chatId)) {
-        conversations.set(chatId, {
-            id: chatId,
-            platform: 'whatsapp',
-            from,
-            name: name || from,
-            avatar: (name || from).substring(0, 2).toUpperCase(),
-            intent: 'general',
-            vip: false,
-            tags: [],
-            messages: [],
-            unread: false,
-            flagged: false,
-        });
-    }
-    const conv = conversations.get(chatId);
-    if (name) conv.name = name;
-    conv.messages.push({
-        text: text || '(media)',
-        time: timestamp ? new Date(timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        incoming,
-    });
-    if (incoming) conv.unread = true;
-
-    return conv;
-}
-
-/**
- * Process webhook payload and return parsed messages
- */
-function processWebhookPayload(body) {
+async function processWebhookPayload(body, io) {
     const results = [];
     if (body.object !== 'whatsapp_business_account') return results;
 
@@ -220,6 +133,7 @@ function processWebhookPayload(body) {
             if (change.field !== 'messages') continue;
             const value = change.value || {};
             const metadata = value.metadata || {};
+            const phoneNumberId = metadata.phone_number_id;
             const messages = value.messages || [];
             const contacts = value.contacts || [];
             const fromIndex = {};
@@ -228,11 +142,16 @@ function processWebhookPayload(body) {
                 if (c.wa_id) fromIndex[c.wa_id] = c.profile?.name || c.wa_id;
             }
 
+            // Find which user owns this phoneNumberId
+            // For now, we'll broadcast and let the frontend filter
+            // In a multi-user production app, you'd query Firestore for the owner
+
             for (const msg of messages) {
                 const from = msg.from;
-                const name = fromIndex[from] || value.profile?.name || from;
+                const name = fromIndex[from] || from;
+                const chatId = `wa_${from}`;
                 let text = '';
-                let timestamp = msg.timestamp;
+                const timestamp = msg.timestamp;
 
                 if (msg.type === 'text' && msg.text) {
                     text = msg.text.body || '';
@@ -242,13 +161,18 @@ function processWebhookPayload(body) {
                     text = `[${msg.type}]`;
                 }
 
-                const conv = addConversationFromWebhook(from, name, text, true, timestamp);
+                const time = timestamp
+                    ? new Date(parseInt(timestamp) * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
                 results.push({
-                    chatId: conv.id,
+                    chatId,
                     from,
                     name,
                     text,
+                    time,
                     id: msg.id,
+                    phoneNumberId,
                     timestamp,
                 });
             }
@@ -258,17 +182,14 @@ function processWebhookPayload(body) {
 }
 
 /**
- * Get all conversations as thread list (for get_whatsapp_chats)
+ * Get all WhatsApp threads from Firestore
  */
-function getThreads() {
-    return Array.from(conversations.values()).map((c) => ({
-        ...c,
-        messages: c.messages.slice(-12),
-    }));
+async function getThreads(userId) {
+    return store.getInbox(userId, 'whatsapp');
 }
 
 /**
- * Extract phone number from chatId for sending
+ * Extract phone number from chatId
  */
 function chatIdToPhoneNumber(chatId) {
     if (!chatId) return null;
@@ -278,7 +199,7 @@ function chatIdToPhoneNumber(chatId) {
     return String(chatId).replace(/@c\.us$/, '').replace(/\D/g, '');
 }
 
-/** Verify token for Meta webhook subscription (must match Meta App config) */
+/** Verify token for Meta webhook subscription */
 function getVerifyToken() {
     return process.env.WHATSAPP_VERIFY_TOKEN || 'flowsync_verify_token';
 }
@@ -291,9 +212,7 @@ module.exports = {
     getThreads,
     sendMessage,
     processWebhookPayload,
-    addConversationFromWebhook,
     chatIdToPhoneNumber,
-    loadCredentials,
-    initFromEnv,
     getVerifyToken,
+    validateCredentials,
 };

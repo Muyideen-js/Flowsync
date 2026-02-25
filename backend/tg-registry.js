@@ -1,14 +1,15 @@
 /**
- * tg-registry.js — Per-user Telegram bot registry
+ * tg-registry.js — Per-user Telegram bot registry with Firestore persistence
  *
  * Each user provides their OWN bot token.
- * The registry creates an isolated polling bot instance per user.
- * Incoming messages → emitted privately via io.to(userId).emit()
+ * Tokens and lastUpdateId are persisted in Firestore so bots auto-restore on restart.
+ * Incoming messages → saved to Firestore, then emitted via io.to(userId).emit()
  *
  * State per user:  idle → connecting → ready | error
  */
 
 const axios = require('axios');
+const store = require('./firestore');
 
 class UserTGManager {
     constructor(userId, io) {
@@ -33,14 +34,38 @@ class UserTGManager {
 
     isReady() { return this.state === 'ready'; }
 
+    /**
+     * Restore from Firestore — called on server start or socket reconnect
+     * Returns true if successfully restored and polling started
+     */
+    async restoreFromFirestore() {
+        const conn = await store.getConnection(this.userId, 'telegram');
+        if (!conn?.botToken) return false;
+
+        console.log(`[TG:${this.userId.substring(0, 8)}] Restoring from Firestore...`);
+        this.token = conn.botToken;
+        this.lastUpdateId = conn.lastUpdateId || 0;
+
+        return this.start();
+    }
+
     /** Start a bot with the given token */
     async start(token) {
-        if (token) this.token = token; // update token if provided
+        if (token) this.token = token;
 
         if (!this.token) {
             this._setState('error');
             this._emit('tg_error', { error: 'No bot token provided' });
             return false;
+        }
+
+        // If already ready with same token, just re-emit state
+        if (this.state === 'ready' && this.pollingInterval) {
+            this._emit('tg_connected', {
+                username: this.botInfo?.username,
+                firstName: this.botInfo?.first_name,
+            });
+            return true;
         }
 
         // Validate token by calling getMe
@@ -60,6 +85,16 @@ class UserTGManager {
             return false;
         }
 
+        // Persist connection to Firestore
+        await store.setConnection(this.userId, 'telegram', {
+            botToken: this.token,
+            botUsername: this.botInfo.username,
+            botFirstName: this.botInfo.first_name,
+            lastUpdateId: this.lastUpdateId,
+            state: 'ready',
+            connectedAt: new Date().toISOString(),
+        });
+
         // Start long-polling
         this._startPolling();
         this._setState('ready');
@@ -72,7 +107,6 @@ class UserTGManager {
 
     _startPolling() {
         if (this.pollingInterval) clearInterval(this.pollingInterval);
-        // Poll every 2 seconds for new updates
         this.pollingInterval = setInterval(() => this._poll(), 2000);
     }
 
@@ -87,25 +121,59 @@ class UserTGManager {
                 }
             );
             const updates = res.data?.result || [];
+            let updatedOffset = false;
+
             for (const upd of updates) {
                 if (upd.update_id > this.lastUpdateId) {
                     this.lastUpdateId = upd.update_id;
+                    updatedOffset = true;
                 }
                 const msg = upd.message || upd.channel_post;
                 if (!msg?.text) continue;
 
                 const chatId = String(msg.chat.id);
+                const threadId = `tg_${chatId}`;
+                const name = msg.from?.first_name
+                    ? `${msg.from.first_name}${msg.from.last_name ? ' ' + msg.from.last_name : ''}`
+                    : msg.chat.title || chatId;
+                const avatar = (msg.from?.first_name || msg.chat.title || '?').substring(0, 2).toUpperCase();
+                const time = new Date(msg.date * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+                // Save to Firestore FIRST
+                await store.saveThread(this.userId, threadId, {
+                    platform: 'telegram',
+                    telegramChatId: chatId,
+                    name,
+                    avatar,
+                    intent: 'general',
+                    vip: false,
+                    tags: [],
+                    flagged: false,
+                });
+                await store.saveMessage(this.userId, threadId, {
+                    id: `tg_msg_${upd.update_id}`,
+                    text: msg.text,
+                    time,
+                    incoming: true,
+                });
+
+                // THEN emit to socket
                 this._emit('telegram_incoming_message', {
-                    chatId: `tg_${chatId}`,
+                    chatId: threadId,
                     telegramChatId: chatId,
                     platform: 'telegram',
-                    name: msg.from?.first_name
-                        ? `${msg.from.first_name}${msg.from.last_name ? ' ' + msg.from.last_name : ''}`
-                        : msg.chat.title || chatId,
-                    avatar: (msg.from?.first_name || msg.chat.title || '?').substring(0, 2).toUpperCase(),
+                    name,
+                    avatar,
                     text: msg.text,
-                    time: new Date(msg.date * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    time,
                     incoming: true,
+                });
+            }
+
+            // Persist lastUpdateId so we don't re-fetch on restart
+            if (updatedOffset) {
+                await store.setConnection(this.userId, 'telegram', {
+                    lastUpdateId: this.lastUpdateId,
                 });
             }
         } catch (_) {
@@ -113,48 +181,10 @@ class UserTGManager {
         }
     }
 
-    /** Fetch last N messages as threads */
-    async fetchHistory(limit = 30) {
-        if (!this.token) return [];
-        try {
-            const res = await axios.get(
-                `https://api.telegram.org/bot${this.token}/getUpdates`,
-                { params: { limit, offset: -limit }, timeout: 12000 }
-            );
-            const updates = res.data?.result || [];
-
-            // Update lastUpdateId so we don't re-emit these as new messages
-            for (const upd of updates) {
-                if (upd.update_id > this.lastUpdateId) this.lastUpdateId = upd.update_id;
-            }
-
-            const chatMap = {};
-            for (const upd of updates) {
-                const msg = upd.message || upd.channel_post;
-                if (!msg) continue;
-                const cid = String(msg.chat.id);
-                if (!chatMap[cid]) {
-                    chatMap[cid] = {
-                        id: `tg_${cid}`, platform: 'telegram', telegramChatId: cid,
-                        name: msg.chat.first_name
-                            ? `${msg.chat.first_name}${msg.chat.last_name ? ' ' + msg.chat.last_name : ''}`
-                            : msg.chat.title || msg.chat.username || cid,
-                        avatar: (msg.chat.first_name || msg.chat.title || 'T').substring(0, 2).toUpperCase(),
-                        intent: 'general', vip: false, tags: [],
-                        messages: [], unread: false, flagged: false,
-                    };
-                }
-                chatMap[cid].messages.push({
-                    text: msg.text || '(media)',
-                    time: new Date(msg.date * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    incoming: true,
-                });
-            }
-            return Object.values(chatMap);
-        } catch (err) {
-            console.error(`[TG:${this.userId.substring(0, 8)}] fetchHistory error:`, err.message);
-            return [];
-        }
+    /** Fetch threads from Firestore (fast, cached) */
+    async fetchHistory() {
+        const threads = await store.getInbox(this.userId, 'telegram');
+        return threads;
     }
 
     /** Send a message */
@@ -165,14 +195,25 @@ class UserTGManager {
             { chat_id: telegramChatId, text },
             { timeout: 10000 }
         );
+
+        // Save outgoing message to Firestore
+        const threadId = `tg_${telegramChatId}`;
+        await store.saveMessage(this.userId, threadId, {
+            text,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            incoming: false,
+        });
     }
 
     /** Stop the bot */
-    stop() {
+    async stop() {
         if (this.pollingInterval) { clearInterval(this.pollingInterval); this.pollingInterval = null; }
         this.token = null;
         this.botInfo = null;
         this._setState('idle');
+
+        // Update Firestore
+        await store.deleteConnection(this.userId, 'telegram');
     }
 }
 
@@ -194,7 +235,7 @@ class TGRegistry {
 
     async reset(userId) {
         const mgr = this._managers.get(userId);
-        if (mgr) { mgr.stop(); this._managers.delete(userId); }
+        if (mgr) { await mgr.stop(); this._managers.delete(userId); }
     }
 }
 
