@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import MainLayout from '../../components/Layout/MainLayout';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSocket } from '../../contexts/SocketContext';
+import twitterService from '../../services/twitterService';
 import './Accounts.css';
 
 /**
@@ -145,12 +146,19 @@ const Accounts = () => {
             console.log('[Accounts] Using shared socket for user:', userData.uid.substring(0, 8));
             sharedSocket.emit('get_whatsapp_status');
             sharedSocket.emit('start_whatsapp');
+            sharedSocket.emit('get_telegram_status');
             if (!tgExplicitDisconnect.current) {
                 const savedToken = userData.connectedAccounts?.telegram?.botToken;
                 if (savedToken) {
                     sharedSocket.emit('connect_telegram_bot', { botToken: savedToken });
                 }
             }
+            // Check Twitter status via REST API
+            twitterService.checkStatus().then(res => {
+                if (res.connected) {
+                    setConnections(prev => ({ ...prev, twitter: { connected: true, handle: `@${res.data?.username || 'connected'}`, lastSync: 'Synced' } }));
+                }
+            }).catch(() => { });
         }
 
         /* ─── Telegram state events ─── */
@@ -326,11 +334,48 @@ const Accounts = () => {
         setTgModal(false);
     }, [tgChatId, tgBotToken, updateUserData]);
 
+    const handleConnectTwitter = useCallback(async () => {
+        try {
+            const res = await twitterService.getAuthUrl();
+            if (res.success && res.authUrl) {
+                // Open Twitter OAuth in a popup
+                const popup = window.open(res.authUrl, 'twitter_oauth', 'width=600,height=700,scrollbars=yes');
+                // Poll for popup close → then check connection status
+                const checkPopup = setInterval(async () => {
+                    if (!popup || popup.closed) {
+                        clearInterval(checkPopup);
+                        // Check if Twitter connected after OAuth
+                        const status = await twitterService.checkStatus();
+                        if (status.connected) {
+                            setConnections(prev => ({
+                                ...prev,
+                                twitter: { connected: true, handle: `@${status.data?.username || 'connected'}`, lastSync: 'Just now' }
+                            }));
+                            updateUserData({
+                                'connectedAccounts.twitter': {
+                                    connected: true,
+                                    handle: `@${status.data?.username || 'connected'}`,
+                                    connectedAt: new Date().toISOString()
+                                }
+                            });
+                        }
+                    }
+                }, 1000);
+            } else {
+                alert('Could not get Twitter auth URL. Check your backend.');
+            }
+        } catch (err) {
+            console.error('Twitter OAuth error:', err);
+            alert('Failed to connect Twitter. Make sure your backend is running.');
+        }
+    }, [updateUserData]);
+
     const handleConnect = useCallback((id) => {
         if (id === 'whatsapp') { handleConnectWA(); return; }
         if (id === 'telegram') { handleConnectTelegram(); return; }
-        alert(`Opening OAuth flow for ${id}…`);
-    }, [handleConnectWA, handleConnectTelegram]);
+        if (id === 'twitter') { handleConnectTwitter(); return; }
+        alert(`${id} OAuth not yet implemented.`);
+    }, [handleConnectWA, handleConnectTelegram, handleConnectTwitter]);
 
     const handleDisconnect = useCallback((id) => {
         if (!window.confirm(`Disconnect from ${id}?`)) return;

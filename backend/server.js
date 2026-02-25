@@ -105,6 +105,9 @@ io.on('connection', (socket) => {
     /* ── get_whatsapp_status ── */
     socket.on('get_whatsapp_status', () => syncWAState(socket));
 
+    /* ── get_telegram_status ── */
+    socket.on('get_telegram_status', () => syncTGState(socket));
+
     /* ── reset_whatsapp ── */
     socket.on('reset_whatsapp', async (payload, ack) => {
         await registry.reset(userId);

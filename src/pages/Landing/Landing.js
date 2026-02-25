@@ -52,7 +52,7 @@ const Landing = () => {
                 <div className="hero-container">
                     <div className="badge">
                         <div className="badge-dot"></div>
-                        AI Platform
+                        AI
                     </div>
 
                     <h1 className="hero-h1">
