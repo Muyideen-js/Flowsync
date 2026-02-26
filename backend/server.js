@@ -7,6 +7,7 @@ const crypto = require('crypto');
 const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
+const admin = require('firebase-admin');
 const tgRegistry = require('./tg-registry');
 const waCloud = require('./whatsapp-cloud');
 const store = require('./firestore');
@@ -37,15 +38,60 @@ const CALLBACK_URL = process.env.RENDER_EXTERNAL_URL
 const oauthStates = new Map();
 
 /* ─────────────────────────────────────────────────────────
-   Socket Auth Middleware
+   Firebase ID Token Verification — REST Middleware
    ───────────────────────────────────────────────────────── */
-io.use((socket, next) => {
-    const userId = socket.handshake.auth?.userId;
-    if (!userId || typeof userId !== 'string' || userId.length < 4) {
-        return next(new Error('Socket auth: missing or invalid userId'));
+async function verifyTokenFromHeader(req, res, next) {
+    const authHeader = req.headers.authorization;
+    if (!authHeader?.startsWith('Bearer ')) {
+        return res.status(401).json({ success: false, error: 'Missing auth token' });
     }
-    socket.userId = userId;
-    next();
+    try {
+        const decoded = await admin.auth().verifyIdToken(authHeader.split(' ')[1]);
+        req.userId = decoded.uid;
+        next();
+    } catch (err) {
+        return res.status(401).json({ success: false, error: 'Invalid auth token' });
+    }
+}
+
+/* ─────────────────────────────────────────────────────────
+   Build Full Connection States Helper
+   ───────────────────────────────────────────────────────── */
+async function buildFullStates(userId) {
+    const conn = await store.getUserConnections(userId);
+    return {
+        telegram: {
+            connected: !!(conn.telegram?.botToken && conn.telegram?.state === 'ready'),
+            username: conn.telegram?.botUsername || null,
+            firstName: conn.telegram?.botFirstName || null,
+        },
+        whatsapp: {
+            connected: !!(conn.whatsapp?.accessToken),
+            displayPhone: conn.whatsapp?.displayPhone || null,
+        },
+        twitter: {
+            connected: !!(conn.twitter?.accessToken),
+            username: conn.twitter?.username || null,
+            name: conn.twitter?.name || null,
+        },
+    };
+}
+
+/* ─────────────────────────────────────────────────────────
+   Socket Auth Middleware — Firebase ID Token Verification
+   ───────────────────────────────────────────────────────── */
+io.use(async (socket, next) => {
+    const token = socket.handshake.auth?.token;
+    if (!token) {
+        return next(new Error('Socket auth: missing token'));
+    }
+    try {
+        const decoded = await admin.auth().verifyIdToken(token);
+        socket.userId = decoded.uid;
+        next();
+    } catch (err) {
+        return next(new Error('Socket auth: invalid token'));
+    }
 });
 
 /* ─────────────────────────────────────────────────────────
@@ -57,28 +103,10 @@ io.on('connection', async (socket) => {
     console.log(`[Socket] Connected: ${socket.id} (user: ${userId.substring(0, 8)}…)`);
 
     // ── Load ALL connection states from Firestore and emit at once ──
-    const connections = await store.getUserConnections(userId);
-
-    // Build connection_states payload
-    const states = {
-        telegram: {
-            connected: !!(connections.telegram?.botToken && connections.telegram?.state === 'ready'),
-            username: connections.telegram?.botUsername || null,
-            firstName: connections.telegram?.botFirstName || null,
-        },
-        whatsapp: {
-            connected: !!(connections.whatsapp?.accessToken),
-            displayPhone: connections.whatsapp?.displayPhone || null,
-        },
-        twitter: {
-            connected: !!(connections.twitter?.accessToken),
-            username: connections.twitter?.username || null,
-            name: connections.twitter?.name || null,
-        },
-    };
-    socket.emit('connection_states', states);
+    socket.emit('connection_states', await buildFullStates(userId));
 
     // ── Auto-restore Telegram bot if connected ──
+    const connections = await store.getUserConnections(userId);
     if (connections.telegram?.botToken) {
         const mgr = tgRegistry.get(userId);
         if (!mgr.isReady()) {
@@ -92,23 +120,7 @@ io.on('connection', async (socket) => {
 
     /* ── get_connection_states — re-sync on demand ── */
     socket.on('get_connection_states', async () => {
-        const conn = await store.getUserConnections(userId);
-        socket.emit('connection_states', {
-            telegram: {
-                connected: !!(conn.telegram?.botToken && conn.telegram?.state === 'ready'),
-                username: conn.telegram?.botUsername || null,
-                firstName: conn.telegram?.botFirstName || null,
-            },
-            whatsapp: {
-                connected: !!(conn.whatsapp?.accessToken),
-                displayPhone: conn.whatsapp?.displayPhone || null,
-            },
-            twitter: {
-                connected: !!(conn.twitter?.accessToken),
-                username: conn.twitter?.username || null,
-                name: conn.twitter?.name || null,
-            },
-        });
+        socket.emit('connection_states', await buildFullStates(userId));
     });
 
     /* ── get_inbox — load from Firestore ── */
@@ -140,9 +152,7 @@ io.on('connection', async (socket) => {
         try {
             const result = await waCloud.connect(userId, accessToken, phoneNumberId, wabaId);
             if (result.ok) {
-                socket.emit('connection_states', {
-                    whatsapp: { connected: true, displayPhone: result.displayPhone },
-                });
+                socket.emit('connection_states', await buildFullStates(userId));
             } else {
                 socket.emit('wa_error', { error: result.error });
             }
@@ -153,14 +163,7 @@ io.on('connection', async (socket) => {
 
     /* ── get_whatsapp_status ── */
     socket.on('get_whatsapp_status', async () => {
-        const connected = await waCloud.isConnected(userId);
-        const creds = await waCloud.getCredentials(userId);
-        socket.emit('connection_states', {
-            whatsapp: {
-                connected,
-                displayPhone: creds?.displayPhone || null,
-            },
-        });
+        socket.emit('connection_states', await buildFullStates(userId));
     });
 
     /* ── get_whatsapp_chats ── */
@@ -187,9 +190,7 @@ io.on('connection', async (socket) => {
     /* ── disconnect_whatsapp ── */
     socket.on('disconnect_whatsapp', async () => {
         await waCloud.disconnect(userId);
-        socket.emit('connection_states', {
-            whatsapp: { connected: false, displayPhone: null },
-        });
+        socket.emit('connection_states', await buildFullStates(userId));
     });
 
     /* ═══════════════════════════════════════════════════════
@@ -206,14 +207,8 @@ io.on('connection', async (socket) => {
             const mgr = tgRegistry.get(userId);
             const ok = await mgr.start(botToken.trim());
             if (ok) {
-                // Emit updated connection states
-                socket.emit('connection_states', {
-                    telegram: {
-                        connected: true,
-                        username: mgr.botInfo?.username,
-                        firstName: mgr.botInfo?.first_name,
-                    },
-                });
+                // Emit FULL connection states
+                socket.emit('connection_states', await buildFullStates(userId));
                 // Fetch existing threads from Firestore
                 const threads = await mgr.fetchHistory();
                 if (threads.length > 0) socket.emit('telegram_threads', threads);
@@ -258,9 +253,7 @@ io.on('connection', async (socket) => {
     /* ── disconnect_telegram_bot ── */
     socket.on('disconnect_telegram_bot', async () => {
         await tgRegistry.reset(userId);
-        socket.emit('connection_states', {
-            telegram: { connected: false, username: null, firstName: null },
-        });
+        socket.emit('connection_states', await buildFullStates(userId));
     });
 
     /* ── send_telegram_message ── */
@@ -328,8 +321,8 @@ app.post('/api/whatsapp/webhook', async (req, res) => {
 /* ─────────────────────────────────────────────────────────
    Twitter OAuth 2.0 — Per-User with DM Scopes
    ───────────────────────────────────────────────────────── */
-app.get('/api/twitter/auth-url', (req, res) => {
-    const userId = req.query.userId;
+app.get('/api/twitter/auth-url', verifyTokenFromHeader, (req, res) => {
+    const userId = req.userId;
     const state = crypto.randomBytes(16).toString('hex');
     const codeChallenge = crypto.randomBytes(32).toString('base64url');
     oauthStates.set(state, { codeChallenge, userId, timestamp: Date.now() });
@@ -388,10 +381,8 @@ app.get('/api/twitter/callback', async (req, res) => {
                 connectedAt: new Date().toISOString(),
             });
 
-            // Notify user's socket of new connection
-            io.to(userId).emit('connection_states', {
-                twitter: { connected: true, username: twitterData.username, name: twitterData.name },
-            });
+            // Notify user's socket of FULL connection state
+            io.to(userId).emit('connection_states', await buildFullStates(userId));
         }
 
         oauthStates.delete(state);
@@ -402,9 +393,8 @@ app.get('/api/twitter/callback', async (req, res) => {
     }
 });
 
-app.get('/api/twitter/status', async (req, res) => {
-    const userId = req.query.userId;
-    if (!userId) return res.json({ success: false, connected: false });
+app.get('/api/twitter/status', verifyTokenFromHeader, async (req, res) => {
+    const userId = req.userId;
 
     const conn = await store.getConnection(userId, 'twitter');
     if (conn?.accessToken) {
@@ -418,9 +408,9 @@ app.get('/api/twitter/status', async (req, res) => {
     }
 });
 
-app.post('/api/twitter/tweet', async (req, res) => {
-    const { text, userId } = req.body;
-    if (!userId) return res.status(400).json({ success: false, error: 'userId required' });
+app.post('/api/twitter/tweet', verifyTokenFromHeader, async (req, res) => {
+    const { text } = req.body;
+    const userId = req.userId;
 
     const conn = await store.getConnection(userId, 'twitter');
     if (!conn?.accessToken) return res.status(401).json({ success: false, error: 'Not authenticated' });
@@ -473,9 +463,8 @@ app.post('/api/twitter/tweet', async (req, res) => {
 });
 
 /* ── Twitter DMs endpoint ── */
-app.get('/api/twitter/dms', async (req, res) => {
-    const userId = req.query.userId;
-    if (!userId) return res.status(400).json({ success: false, error: 'userId required' });
+app.get('/api/twitter/dms', verifyTokenFromHeader, async (req, res) => {
+    const userId = req.userId;
 
     const conn = await store.getConnection(userId, 'twitter');
     if (!conn?.accessToken) return res.status(401).json({ success: false, error: 'Not authenticated' });
@@ -495,13 +484,10 @@ app.get('/api/twitter/dms', async (req, res) => {
 });
 
 /* ── Disconnect Twitter ── */
-app.post('/api/twitter/disconnect', async (req, res) => {
-    const { userId } = req.body;
-    if (!userId) return res.status(400).json({ success: false, error: 'userId required' });
+app.post('/api/twitter/disconnect', verifyTokenFromHeader, async (req, res) => {
+    const userId = req.userId;
     await store.deleteConnection(userId, 'twitter');
-    io.to(userId).emit('connection_states', {
-        twitter: { connected: false, username: null, name: null },
-    });
+    io.to(userId).emit('connection_states', await buildFullStates(userId));
     res.json({ success: true });
 });
 

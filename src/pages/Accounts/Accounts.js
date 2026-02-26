@@ -182,10 +182,10 @@ const Accounts = () => {
     }, [tgBotToken, updateUserData]);
 
     const handleConnectTwitter = useCallback(async () => {
-        const userId = user?.uid;
-        if (!userId) { alert('Please log in first.'); return; }
+        if (!user) { alert('Please log in first.'); return; }
         try {
-            const res = await twitterService.getAuthUrl(userId);
+            const token = await user.getIdToken();
+            const res = await twitterService.getAuthUrl(token);
             if (res.success && res.authUrl) {
                 const popup = window.open(res.authUrl, 'twitter_oauth', 'width=600,height=700,scrollbars=yes');
                 const checkPopup = setInterval(() => {
@@ -228,7 +228,8 @@ const Accounts = () => {
             return;
         }
         if (id === 'twitter') {
-            await twitterService.disconnect(user?.uid);
+            const token = await user.getIdToken();
+            await twitterService.disconnect(token);
             updateUserData({ 'connectedAccounts.twitter': { connected: false, connectedAt: null } });
             return;
         }

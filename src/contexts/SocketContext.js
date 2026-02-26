@@ -42,44 +42,50 @@ export const SocketProvider = ({ children }) => {
         if (socketRef.current?.connected) return;
         if (socketRef.current) socketRef.current.disconnect();
 
-        const socket = io(SOCKET_URL, {
-            auth: { userId: user.uid },
-            transports: ['websocket', 'polling'],
-            reconnectionAttempts: Infinity,
-            reconnectionDelay: 2000,
-            reconnectionDelayMax: 10000,
-            timeout: 15000,
-        });
+        // Get Firebase ID token and connect with it
+        let cancelled = false;
+        user.getIdToken().then((token) => {
+            if (cancelled) return;
 
-        socketRef.current = socket;
+            const socket = io(SOCKET_URL, {
+                auth: { token },
+                transports: ['websocket', 'polling'],
+                reconnectionAttempts: Infinity,
+                reconnectionDelay: 2000,
+                reconnectionDelayMax: 10000,
+                timeout: 15000,
+            });
 
-        socket.on('connect', () => {
-            console.log(`[Socket] Connected: ${socket.id} (user: ${user.uid.substring(0, 8)})`);
-            setConnected(true);
-        });
+            socketRef.current = socket;
 
-        socket.on('disconnect', (reason) => {
-            console.log(`[Socket] Disconnected: ${reason}`);
-            setConnected(false);
-        });
+            socket.on('connect', () => {
+                console.log(`[Socket] Connected: ${socket.id} (user: ${user.uid.substring(0, 8)})`);
+                setConnected(true);
+            });
 
-        socket.on('connect_error', (err) => {
-            console.warn(`[Socket] Connection error: ${err.message}`);
-            setConnected(false);
-        });
+            socket.on('disconnect', (reason) => {
+                console.log(`[Socket] Disconnected: ${reason}`);
+                setConnected(false);
+            });
 
-        // Listen for unified connection states from backend
-        socket.on('connection_states', (states) => {
-            console.log('[Socket] Connection states received:', states);
-            setConnectionStates(prev => ({
-                ...(prev || {}),
-                ...states,
-            }));
+            socket.on('connect_error', (err) => {
+                console.warn(`[Socket] Connection error: ${err.message}`);
+                setConnected(false);
+            });
+
+            // Backend always emits FULL state objects — replace entirely
+            socket.on('connection_states', (states) => {
+                console.log('[Socket] Connection states received:', states);
+                setConnectionStates(states);
+            });
         });
 
         return () => {
-            socket.disconnect();
-            socketRef.current = null;
+            cancelled = true;
+            if (socketRef.current) {
+                socketRef.current.disconnect();
+                socketRef.current = null;
+            }
             setConnected(false);
             setConnectionStates(null);
         };

@@ -4,11 +4,11 @@ import axios from 'axios';
 const BACKEND_URL = 'https://flowsync-3fd5.onrender.com';
 
 class TwitterService {
-    // Get OAuth authorization URL — pass userId so backend stores tokens per-user
-    async getAuthUrl(userId) {
+    // Get OAuth authorization URL — send Firebase ID token for auth
+    async getAuthUrl(token) {
         try {
             const response = await axios.get(`${BACKEND_URL}/api/twitter/auth-url`, {
-                params: { userId },
+                headers: { Authorization: `Bearer ${token}` },
             });
             return response.data;
         } catch (error) {
@@ -17,11 +17,11 @@ class TwitterService {
         }
     }
 
-    // Check connection status — per-user
-    async checkStatus(userId) {
+    // Check connection status — authenticated via token
+    async checkStatus(token) {
         try {
             const response = await axios.get(`${BACKEND_URL}/api/twitter/status`, {
-                params: { userId },
+                headers: { Authorization: `Bearer ${token}` },
             });
             return response.data;
         } catch (error) {
@@ -30,10 +30,12 @@ class TwitterService {
         }
     }
 
-    // Post tweet — per-user
-    async postTweet(text, userId) {
+    // Post tweet — authenticated via token
+    async postTweet(text, token) {
         try {
-            const response = await axios.post(`${BACKEND_URL}/api/twitter/tweet`, { text, userId });
+            const response = await axios.post(`${BACKEND_URL}/api/twitter/tweet`, { text }, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
             return response.data;
         } catch (error) {
             console.error('Error posting tweet:', error);
@@ -41,10 +43,12 @@ class TwitterService {
         }
     }
 
-    // Disconnect Twitter — per-user
-    async disconnect(userId) {
+    // Disconnect Twitter — authenticated via token
+    async disconnect(token) {
         try {
-            const response = await axios.post(`${BACKEND_URL}/api/twitter/disconnect`, { userId });
+            const response = await axios.post(`${BACKEND_URL}/api/twitter/disconnect`, {}, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
             return response.data;
         } catch (error) {
             console.error('Error disconnecting Twitter:', error);
@@ -52,11 +56,11 @@ class TwitterService {
         }
     }
 
-    // Get DMs — per-user
-    async getDMs(userId) {
+    // Get DMs — authenticated via token
+    async getDMs(token) {
         try {
             const response = await axios.get(`${BACKEND_URL}/api/twitter/dms`, {
-                params: { userId },
+                headers: { Authorization: `Bearer ${token}` },
             });
             return response.data;
         } catch (error) {
