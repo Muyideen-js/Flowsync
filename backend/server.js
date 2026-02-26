@@ -412,8 +412,12 @@ app.post('/api/twitter/tweet', verifyTokenFromHeader, async (req, res) => {
     const { text } = req.body;
     const userId = req.userId;
 
+    if (!text?.trim()) return res.status(400).json({ success: false, error: 'Tweet text is required' });
+
     const conn = await store.getConnection(userId, 'twitter');
-    if (!conn?.accessToken) return res.status(401).json({ success: false, error: 'Not authenticated' });
+    if (!conn?.accessToken) return res.status(401).json({ success: false, error: 'Not authenticated with X. Please reconnect.' });
+
+    console.log(`[Twitter] Posting tweet for user ${userId.substring(0, 8)}… (${text.length} chars)`);
 
     try {
         const response = await axios.post(
@@ -421,10 +425,16 @@ app.post('/api/twitter/tweet', verifyTokenFromHeader, async (req, res) => {
             { text },
             { headers: { Authorization: `Bearer ${conn.accessToken}`, 'Content-Type': 'application/json' } }
         );
+        console.log(`[Twitter] ✅ Tweet posted: ${response.data?.data?.id}`);
         res.json({ success: true, data: response.data.data });
     } catch (error) {
+        const twitterError = error.response?.data;
+        const status = error.response?.status;
+        console.error(`[Twitter] ❌ Tweet failed (HTTP ${status}):`, JSON.stringify(twitterError, null, 2) || error.message);
+
         // If token expired, try refresh
-        if (error.response?.status === 401 && conn.refreshToken) {
+        if (status === 401 && conn.refreshToken) {
+            console.log(`[Twitter] Attempting token refresh…`);
             try {
                 const refreshRes = await axios.post(
                     'https://api.twitter.com/2/oauth2/token',
@@ -446,6 +456,7 @@ app.post('/api/twitter/tweet', verifyTokenFromHeader, async (req, res) => {
                     accessToken: newToken,
                     refreshToken: newRefresh,
                 });
+                console.log(`[Twitter] ✅ Token refreshed, retrying tweet…`);
 
                 // Retry with new token
                 const retryRes = await axios.post(
@@ -453,12 +464,21 @@ app.post('/api/twitter/tweet', verifyTokenFromHeader, async (req, res) => {
                     { text },
                     { headers: { Authorization: `Bearer ${newToken}`, 'Content-Type': 'application/json' } }
                 );
+                console.log(`[Twitter] ✅ Tweet posted after refresh: ${retryRes.data?.data?.id}`);
                 return res.json({ success: true, data: retryRes.data.data });
             } catch (refreshErr) {
-                return res.status(401).json({ success: false, error: 'Token refresh failed. Please re-authenticate.' });
+                console.error(`[Twitter] ❌ Token refresh failed:`, refreshErr.response?.data || refreshErr.message);
+                return res.status(401).json({ success: false, error: 'Token expired. Please disconnect and reconnect X.' });
             }
         }
-        res.status(500).json({ success: false, error: error.response?.data || error.message });
+
+        // Extract a readable error message
+        const detail = twitterError?.detail
+            || twitterError?.errors?.[0]?.message
+            || twitterError?.title
+            || (typeof twitterError === 'string' ? twitterError : null)
+            || error.message;
+        res.status(status || 500).json({ success: false, error: detail });
     }
 });
 
