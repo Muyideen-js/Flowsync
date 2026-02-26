@@ -9,6 +9,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const admin = require('firebase-admin');
 const tgRegistry = require('./tg-registry');
+const tgFlowSyncBot = require('./tg-flowsync-bot');
 const waRegistry = require('./wa-registry');
 const store = require('./firestore');
 
@@ -25,6 +26,11 @@ const io = new Server(server, {
 // Give registries a reference to io
 tgRegistry.setIO(io);
 waRegistry.setIO(io);
+
+// Start the FlowSync singleton bot
+tgFlowSyncBot.start(io).then(ok => {
+    if (ok) console.log('[Server] FlowSync Telegram bot started');
+}).catch(err => console.error('[Server] FlowSync bot error:', err.message));
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -60,13 +66,37 @@ async function verifyTokenFromHeader(req, res, next) {
    ───────────────────────────────────────────────────────── */
 async function buildFullStates(userId) {
     const conn = await store.getUserConnections(userId);
-    // For WhatsApp, check if the wa-registry manager is ready (QR-based)
     const waMgr = waRegistry.get(userId);
+
+    // Build Telegram connectedBots array
+    const connectedBots = [];
+    // FlowSync bot
+    if (conn.telegram_flowsync?.state === 'ready') {
+        connectedBots.push({
+            botId: 'flowsync',
+            type: 'flowsync',
+            username: tgFlowSyncBot.username || conn.telegram_flowsync?.botUsername,
+            connected: true,
+            autoReply: conn.telegram_flowsync?.autoReply || false,
+        });
+    }
+    // Personal bot
+    const personalMgr = tgRegistry.get(userId);
+    if (conn.telegram_personal?.state === 'ready' || personalMgr.isReady()) {
+        connectedBots.push({
+            botId: conn.telegram_personal?.botId || personalMgr.botId,
+            type: 'personal',
+            username: conn.telegram_personal?.botUsername || personalMgr.botInfo?.username,
+            connected: true,
+            autoReply: conn.telegram_personal?.autoReply || false,
+        });
+    }
+
     return {
         telegram: {
-            connected: !!(conn.telegram?.botToken && conn.telegram?.state === 'ready'),
-            username: conn.telegram?.botUsername || null,
-            firstName: conn.telegram?.botFirstName || null,
+            connected: connectedBots.length > 0,
+            connectedBots,
+            flowsyncBotUsername: tgFlowSyncBot.username || null,
         },
         whatsapp: {
             connected: waMgr.isReady() || conn.whatsapp?.state === 'ready',
@@ -108,15 +138,15 @@ io.on('connection', async (socket) => {
     // ── Load ALL connection states from Firestore and emit at once ──
     socket.emit('connection_states', await buildFullStates(userId));
 
-    // ── Auto-restore Telegram bot if connected ──
+    // ── Auto-restore Telegram personal bot if connected ──
     const connections = await store.getUserConnections(userId);
-    if (connections.telegram?.botToken) {
+    if (connections.telegram_personal?.botToken) {
         const mgr = tgRegistry.get(userId);
         if (!mgr.isReady()) {
             mgr.restoreFromFirestore().then(ok => {
-                if (ok) console.log(`[TG:${userId.substring(0, 8)}] Auto-restored from Firestore`);
+                if (ok) console.log(`[TG:${userId.substring(0, 8)}] Personal bot auto-restored`);
             }).catch(err => {
-                console.error(`[TG:${userId.substring(0, 8)}] Auto-restore failed:`, err.message);
+                console.error(`[TG:${userId.substring(0, 8)}] Personal bot auto-restore failed:`, err.message);
             });
         }
     }
@@ -223,11 +253,41 @@ io.on('connection', async (socket) => {
     });
 
     /* ═══════════════════════════════════════════════════════
-       Telegram Events
+       Telegram Multi-Bot Events
        ═══════════════════════════════════════════════════════ */
 
-    /* ── connect_telegram_bot ── */
-    socket.on('connect_telegram_bot', async ({ botToken } = {}) => {
+    /* ── connect_flowsync_bot — user links via chat ID ── */
+    socket.on('connect_flowsync_bot', async ({ chatId } = {}) => {
+        try {
+            if (!tgFlowSyncBot.isReady()) {
+                socket.emit('tg_error', { error: 'FlowSync bot is not available right now.' });
+                return;
+            }
+            if (chatId) {
+                await tgFlowSyncBot.linkUser(userId, chatId);
+            } else {
+                // Just store the preference — user will message the bot to get linked
+                await store.setConnection(userId, 'telegram_flowsync', {
+                    botId: 'flowsync',
+                    botUsername: tgFlowSyncBot.username,
+                    state: 'ready',
+                    autoReply: false,
+                    linkedAt: new Date().toISOString(),
+                });
+            }
+            socket.emit('connection_states', await buildFullStates(userId));
+            socket.emit('tg_connected', {
+                username: tgFlowSyncBot.username,
+                botId: 'flowsync',
+                type: 'flowsync',
+            });
+        } catch (err) {
+            socket.emit('tg_error', { error: err.message });
+        }
+    });
+
+    /* ── connect_personal_bot — user brings own token ── */
+    socket.on('connect_personal_bot', async ({ botToken } = {}) => {
         if (!botToken?.trim()) {
             socket.emit('tg_error', { error: 'Please provide a bot token.' });
             return;
@@ -236,9 +296,7 @@ io.on('connection', async (socket) => {
             const mgr = tgRegistry.get(userId);
             const ok = await mgr.start(botToken.trim());
             if (ok) {
-                // Emit FULL connection states
                 socket.emit('connection_states', await buildFullStates(userId));
-                // Fetch existing threads from Firestore
                 const threads = await mgr.fetchHistory();
                 if (threads.length > 0) socket.emit('telegram_threads', threads);
             } else {
@@ -249,51 +307,76 @@ io.on('connection', async (socket) => {
         }
     });
 
-    /* ── get_telegram_status ── */
-    socket.on('get_telegram_status', async () => {
-        const mgr = tgRegistry.get(userId);
-        socket.emit('tg_state', { state: mgr.state });
-        if (mgr.isReady()) {
-            socket.emit('tg_connected', {
-                username: mgr.botInfo?.username,
-                firstName: mgr.botInfo?.first_name,
-            });
+    /* ── disconnect_bot — by botId ── */
+    socket.on('disconnect_bot', async ({ botId } = {}) => {
+        try {
+            if (botId === 'flowsync') {
+                await tgFlowSyncBot.unlinkUser(userId);
+            } else {
+                await tgRegistry.reset(userId);
+            }
+            socket.emit('connection_states', await buildFullStates(userId));
+        } catch (err) {
+            socket.emit('tg_error', { error: err.message });
         }
     });
 
-    /* ── get_telegram_messages ── */
-    socket.on('get_telegram_messages', async () => {
+    /* ── get_telegram_messages — filter by botId ── */
+    socket.on('get_telegram_messages', async ({ botId } = {}) => {
         try {
-            const mgr = tgRegistry.get(userId);
-            // Always try Firestore first (even if bot is temporarily disconnected)
             const threads = await store.getInbox(userId, 'telegram');
-            if (threads.length > 0) {
-                socket.emit('telegram_threads', threads);
-            } else if (mgr.isReady()) {
-                // Fallback: fetch from Telegram API if Firestore is empty
-                const apiThreads = await mgr.fetchHistory();
-                if (apiThreads.length > 0) socket.emit('telegram_threads', apiThreads);
-            }
+            const filtered = botId
+                ? threads.filter(t => t.botId === botId)
+                : threads;
+            socket.emit('telegram_threads', filtered);
         } catch (err) {
             console.error(`[TG:${userId.substring(0, 8)}] get_telegram_messages error:`, err.message);
+            socket.emit('telegram_threads', []);
         }
     });
 
-    /* ── disconnect_telegram_bot ── */
+    /* ── send_telegram_message — route by botId ── */
+    socket.on('send_telegram_message', async ({ botId, telegramChatId, text }) => {
+        try {
+            if (botId === 'flowsync') {
+                await tgFlowSyncBot.sendMessage(telegramChatId, text);
+                const threadId = `telegram:flowsync:${telegramChatId}`;
+                await store.saveMessage(userId, threadId, {
+                    text,
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    incoming: false,
+                });
+                socket.emit('send_message_ok', { chatId: threadId });
+            } else {
+                const mgr = tgRegistry.get(userId);
+                await mgr.sendMessage(telegramChatId, text);
+                socket.emit('send_message_ok', { chatId: `telegram:${mgr.botId}:${telegramChatId}` });
+            }
+        } catch (err) {
+            socket.emit('send_message_error', { chatId: telegramChatId, error: err.message });
+        }
+    });
+
+    /* ── set_auto_reply — per bot ── */
+    socket.on('set_auto_reply', async ({ botId, enabled }) => {
+        try {
+            const connKey = botId === 'flowsync' ? 'telegram_flowsync' : 'telegram_personal';
+            await store.setConnection(userId, connKey, { autoReply: !!enabled });
+            socket.emit('connection_states', await buildFullStates(userId));
+        } catch (err) {
+            socket.emit('tg_error', { error: err.message });
+        }
+    });
+
+    /* ── Legacy compat: connect_telegram_bot → redirect to connect_personal_bot ── */
+    socket.on('connect_telegram_bot', async (data) => {
+        socket.emit('tg_error', { error: 'Use connect_personal_bot or connect_flowsync_bot instead.' });
+    });
+
+    /* ── Legacy compat: disconnect_telegram_bot ── */
     socket.on('disconnect_telegram_bot', async () => {
         await tgRegistry.reset(userId);
         socket.emit('connection_states', await buildFullStates(userId));
-    });
-
-    /* ── send_telegram_message ── */
-    socket.on('send_telegram_message', async ({ telegramChatId, text }) => {
-        const mgr = tgRegistry.get(userId);
-        try {
-            await mgr.sendMessage(telegramChatId, text);
-            socket.emit('send_message_ok', { chatId: `tg_${telegramChatId}` });
-        } catch (err) {
-            socket.emit('send_message_error', { chatId: `tg_${telegramChatId}`, error: err.message });
-        }
     });
 
     /* ═══════════════════════════════════════════════════════

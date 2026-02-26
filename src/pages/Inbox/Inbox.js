@@ -111,6 +111,7 @@ const Inbox = () => {
     const [aiIntent, setAiIntent] = useState('');
     const [autoReply, setAutoReply] = useState({ instagram: false, twitter: false, whatsapp: true, telegram: false });
     const [searchQuery, setSearchQuery] = useState('');
+    const [tgSubTab, setTgSubTab] = useState('all'); // 'all' | 'flowsync' | 'personal'
 
     /* ── WA connection tracking (linked=DB, ready=backend) ───────────────────── */
     const [waReady, setWaReady] = useState(null); // null = unknown, true = ready, false = not ready
@@ -298,6 +299,10 @@ const Inbox = () => {
     /* ── Filter / search ────────────────────────────────────────────────────── */
     const filtered = useMemo(() => threads.filter(t => {
         const matchesPlatform = activePlatform === 'all' || t.platform === activePlatform;
+        // Telegram sub-tab filter
+        const matchesTgSub = activePlatform !== 'telegram' || tgSubTab === 'all' ||
+            (tgSubTab === 'flowsync' && t.botId === 'flowsync') ||
+            (tgSubTab === 'personal' && t.botId && t.botId !== 'flowsync');
         const matchesFilter =
             filter === 'all' ? true :
                 filter === 'unread' ? t.unread :
@@ -305,8 +310,8 @@ const Inbox = () => {
         const matchesSearch = !searchQuery.trim() ||
             t.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
             t.messages?.some(m => m.text?.toLowerCase().includes(searchQuery.toLowerCase()));
-        return matchesPlatform && matchesFilter && matchesSearch;
-    }), [threads, activePlatform, filter, searchQuery]);
+        return matchesPlatform && matchesTgSub && matchesFilter && matchesSearch;
+    }), [threads, activePlatform, tgSubTab, filter, searchQuery]);
 
     const activeThread = selected !== null ? threads.find(t => t.id === selected) : null;
 
@@ -380,7 +385,11 @@ const Inbox = () => {
         if (thread.platform === 'whatsapp') {
             socket.emit('send_whatsapp_message', { chatId: thread.id, text });
         } else if (thread.platform === 'telegram') {
-            socket.emit('send_telegram_message', { telegramChatId: thread.telegramChatId, text });
+            socket.emit('send_telegram_message', {
+                botId: thread.botId || 'flowsync',
+                telegramChatId: thread.telegramChatId,
+                text,
+            });
         } else {
             // Other platforms: just local update
             setSendingReply(false);
@@ -432,6 +441,37 @@ const Inbox = () => {
                             ))}
                         </div>
                     </div>
+
+                    {/* Telegram sub-tabs */}
+                    {activePlatform === 'telegram' && (
+                        <div style={{
+                            display: 'flex', gap: '0', margin: '0 16px 8px',
+                            borderBottom: '1px solid rgba(255,255,255,0.06)',
+                        }}>
+                            {[
+                                { key: 'all', label: 'All' },
+                                { key: 'flowsync', label: '⚡ FlowSync' },
+                                { key: 'personal', label: '🧱 Personal' },
+                            ].map(tab => (
+                                <button
+                                    key={tab.key}
+                                    onClick={() => setTgSubTab(tab.key)}
+                                    style={{
+                                        flex: 1, padding: '8px 4px',
+                                        background: 'none', border: 'none',
+                                        borderBottom: tgSubTab === tab.key ? '2px solid #0088CC' : '2px solid transparent',
+                                        cursor: 'pointer',
+                                        color: tgSubTab === tab.key ? '#0099DD' : 'rgba(255,255,255,0.35)',
+                                        fontSize: '11px', fontWeight: 600,
+                                        fontFamily: 'inherit',
+                                        transition: 'all 0.2s',
+                                    }}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
 
                     <div className="ib-search-filter">
                         <input
@@ -544,7 +584,23 @@ const Inbox = () => {
                                             </div>
                                             <div className="ib-card-content">
                                                 <div className="ib-card-top">
-                                                    <span className="ib-card-name">{t.name}</span>
+                                                    <span className="ib-card-name">
+                                                        {t.name}
+                                                        {t.platform === 'telegram' && t.botId && (
+                                                            <span style={{
+                                                                marginLeft: '6px',
+                                                                padding: '1px 6px',
+                                                                background: t.botId === 'flowsync' ? 'rgba(0,136,204,0.15)' : 'rgba(168,85,247,0.15)',
+                                                                color: t.botId === 'flowsync' ? '#0099DD' : '#A855F7',
+                                                                fontSize: '9px',
+                                                                fontWeight: 700,
+                                                                letterSpacing: '0.04em',
+                                                                verticalAlign: 'middle',
+                                                            }}>
+                                                                {t.botId === 'flowsync' ? 'FS' : 'MY'}
+                                                            </span>
+                                                        )}
+                                                    </span>
                                                     <span className="ib-card-time">{lastMsg?.time}</span>
                                                 </div>
                                                 <p className="ib-card-preview">{lastMsg?.text}</p>
@@ -661,19 +717,62 @@ const Inbox = () => {
 
                                     <div className="ib-ai-card">
                                         <h4>Auto-Reply Settings</h4>
-                                        {Object.entries(platformMeta).map(([key, val]) => (
-                                            <div key={key} className="ib-setting-row">
-                                                <span>{val.name}</span>
-                                                <label className="ib-switch">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={autoReply[key]}
-                                                        onChange={() => toggleAutoReply(key)}
-                                                    />
-                                                    <span className="ib-slider"></span>
-                                                </label>
-                                            </div>
-                                        ))}
+                                        {Object.entries(platformMeta).map(([key, val]) => {
+                                            if (key === 'telegram') {
+                                                // Per-bot toggles for Telegram
+                                                return (
+                                                    <div key={key}>
+                                                        <div className="ib-setting-row">
+                                                            <span>{val.name} (FlowSync)</span>
+                                                            <label className="ib-switch">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={autoReply['telegram_flowsync'] || false}
+                                                                    onChange={() => {
+                                                                        setAutoReply(prev => ({ ...prev, telegram_flowsync: !prev.telegram_flowsync }));
+                                                                        socketRef.current?.emit('set_auto_reply', {
+                                                                            botId: 'flowsync',
+                                                                            enabled: !autoReply.telegram_flowsync,
+                                                                        });
+                                                                    }}
+                                                                />
+                                                                <span className="ib-slider"></span>
+                                                            </label>
+                                                        </div>
+                                                        <div className="ib-setting-row">
+                                                            <span>{val.name} (Personal)</span>
+                                                            <label className="ib-switch">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={autoReply['telegram_personal'] || false}
+                                                                    onChange={() => {
+                                                                        setAutoReply(prev => ({ ...prev, telegram_personal: !prev.telegram_personal }));
+                                                                        socketRef.current?.emit('set_auto_reply', {
+                                                                            botId: 'personal',
+                                                                            enabled: !autoReply.telegram_personal,
+                                                                        });
+                                                                    }}
+                                                                />
+                                                                <span className="ib-slider"></span>
+                                                            </label>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            }
+                                            return (
+                                                <div key={key} className="ib-setting-row">
+                                                    <span>{val.name}</span>
+                                                    <label className="ib-switch">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={autoReply[key]}
+                                                            onChange={() => toggleAutoReply(key)}
+                                                        />
+                                                        <span className="ib-slider"></span>
+                                                    </label>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </>
                             )}

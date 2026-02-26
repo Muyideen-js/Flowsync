@@ -55,6 +55,7 @@ const Accounts = () => {
     const [tgModal, setTgModal] = useState(false);
     const [tgBotToken, setTgBotToken] = useState('');
     const [tgSaving, setTgSaving] = useState(false);
+    const [tgTab, setTgTab] = useState('flowsync'); // 'flowsync' | 'personal'
 
     const [waModal, setWaModal] = useState(false);
     const [waQr, setWaQr] = useState(null);
@@ -148,7 +149,12 @@ const Accounts = () => {
         if (!connectionStates) return null;
         const s = connectionStates[platformId];
         if (!s?.connected) return null;
-        if (platformId === 'telegram') return s.username ? `@${s.username}` : 'Bot connected';
+        if (platformId === 'telegram') {
+            const bots = s.connectedBots || [];
+            if (bots.length === 0) return null;
+            if (bots.length === 1) return bots[0].username ? `@${bots[0].username}` : 'Bot connected';
+            return `${bots.length} bots connected`;
+        }
         if (platformId === 'twitter') return s.username ? `@${s.username}` : 'Connected';
         if (platformId === 'whatsapp') return s.displayPhone || 'Connected';
         return 'Connected';
@@ -174,7 +180,6 @@ const Accounts = () => {
         const token = tgBotToken.trim();
         if (!token) { alert('Please enter your bot token.'); return; }
         setTgSaving(true);
-        // Save to Firestore for persistence
         updateUserData({
             'connectedAccounts.telegram': {
                 connected: true,
@@ -182,12 +187,19 @@ const Accounts = () => {
                 connectedAt: new Date().toISOString(),
             }
         });
-        // Start the bot on backend
         const socket = socketRef.current;
         if (socket?.connected) {
-            socket.emit('connect_telegram_bot', { botToken: token });
+            socket.emit('connect_personal_bot', { botToken: token });
         }
     }, [tgBotToken, updateUserData]);
+
+    const handleConnectFlowSyncBot = useCallback(() => {
+        setTgSaving(true);
+        const socket = socketRef.current;
+        if (socket?.connected) {
+            socket.emit('connect_flowsync_bot', {});
+        }
+    }, []);
 
     const handleConnectTwitter = useCallback(async () => {
         if (!user) { alert('Please log in first.'); return; }
@@ -232,7 +244,11 @@ const Accounts = () => {
             updateUserData({
                 'connectedAccounts.telegram': { connected: false, botToken: null, connectedAt: null }
             });
-            if (socket?.connected) socket.emit('disconnect_telegram_bot');
+            // Disconnect all TG bots
+            if (socket?.connected) {
+                const bots = connectionStates?.telegram?.connectedBots || [];
+                bots.forEach(b => socket.emit('disconnect_bot', { botId: b.botId }));
+            }
             return;
         }
         if (id === 'twitter') {
@@ -446,7 +462,7 @@ const Accounts = () => {
                     </div>
                 )}
 
-                {/* ════ Telegram Connect Modal ════ */}
+                {/* ════ Telegram Dual-Mode Modal ════ */}
                 {tgModal && (
                     <div
                         onClick={() => setTgModal(false)}
@@ -461,7 +477,7 @@ const Accounts = () => {
                         <div
                             onClick={e => e.stopPropagation()}
                             style={{
-                                width: '100%', maxWidth: '420px',
+                                width: '100%', maxWidth: '460px',
                                 background: 'rgba(8, 14, 24, 0.96)',
                                 border: '1px solid rgba(0,136,204,0.25)',
                                 boxShadow: '0 0 60px rgba(0,136,204,0.12), 0 24px 48px rgba(0,0,0,0.6)',
@@ -501,69 +517,207 @@ const Accounts = () => {
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0088CC" strokeWidth="1.8"><path d="M22 2L11 13" /><path d="M22 2L15 22l-4-9-9-4L22 2z" /></svg>
                                 </div>
                                 <div>
-                                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>Telegram Bot</div>
-                                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', marginTop: '1px' }}>Bring your own bot from @BotFather</div>
+                                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>Connect Telegram</div>
+                                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', marginTop: '1px' }}>Choose a connection method</div>
                                 </div>
                             </div>
 
-                            <div style={{ height: '1px', background: 'rgba(255,255,255,0.05)', margin: '0 28px' }} />
+                            {/* Tab selector */}
+                            <div style={{
+                                display: 'flex', margin: '0 28px', gap: '0',
+                                borderBottom: '1px solid rgba(255,255,255,0.06)',
+                            }}>
+                                {[
+                                    { key: 'flowsync', label: '⚡ FlowSync Bot', sub: 'Official bot' },
+                                    { key: 'personal', label: '🧱 Personal Bot', sub: 'Your own bot' },
+                                ].map(tab => (
+                                    <button
+                                        key={tab.key}
+                                        onClick={() => setTgTab(tab.key)}
+                                        style={{
+                                            flex: 1, padding: '12px 0',
+                                            background: 'none', border: 'none',
+                                            borderBottom: tgTab === tab.key ? '2px solid #0088CC' : '2px solid transparent',
+                                            cursor: 'pointer',
+                                            color: tgTab === tab.key ? '#0099DD' : 'rgba(255,255,255,0.35)',
+                                            fontSize: '12px', fontWeight: 600,
+                                            fontFamily: 'inherit',
+                                            transition: 'all 0.2s',
+                                            letterSpacing: '0.01em',
+                                        }}
+                                    >
+                                        {tab.label}
+                                    </button>
+                                ))}
+                            </div>
 
-                            {/* Body */}
+                            {/* Tab content */}
                             <div style={{ padding: '20px 28px 24px' }}>
-                                <a
-                                    href="https://t.me/BotFather"
-                                    target="_blank" rel="noopener noreferrer"
-                                    style={{
-                                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                        padding: '10px 14px', marginBottom: '20px',
-                                        background: 'rgba(0,136,204,0.08)',
-                                        border: '1px solid rgba(0,136,204,0.2)',
-                                        color: '#0099DD', fontSize: '12px', fontWeight: 600,
-                                        textDecoration: 'none', letterSpacing: '0.02em',
-                                    }}
-                                >
-                                    <span>① Open @BotFather → /newbot → copy token</span>
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
-                                </a>
+                                {tgTab === 'flowsync' ? (
+                                    <>
+                                        {/* FlowSync Bot Tab */}
+                                        <div style={{
+                                            padding: '16px',
+                                            background: 'rgba(0,136,204,0.06)',
+                                            border: '1px solid rgba(0,136,204,0.15)',
+                                            marginBottom: '16px',
+                                        }}>
+                                            <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)', lineHeight: '1.6' }}>
+                                                <strong style={{ color: '#0099DD' }}>How it works:</strong><br />
+                                                1. Click the button below to open our bot on Telegram<br />
+                                                2. Send <code style={{ background: 'rgba(255,255,255,0.08)', padding: '1px 6px', fontSize: '11px' }}>/start</code> to the bot<br />
+                                                3. Copy your Chat ID and paste it below<br />
+                                                4. All messages will appear in your FlowSync inbox!
+                                            </div>
+                                        </div>
 
-                                {/* Token input */}
-                                <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '8px' }}>
-                                    BOT TOKEN
-                                </div>
-                                <input
-                                    type="text"
-                                    value={tgBotToken}
-                                    onChange={e => setTgBotToken(e.target.value)}
-                                    onKeyDown={e => e.key === 'Enter' && handleSaveTelegram()}
-                                    placeholder="1234567890:ABCDEFghijklmnopqrstuvwxyz"
-                                    autoFocus
-                                    style={{
-                                        width: '100%', padding: '11px 14px',
-                                        background: 'rgba(255,255,255,0.04)',
-                                        border: `1px solid ${tgBotToken.trim() ? 'rgba(0,136,204,0.5)' : 'rgba(255,255,255,0.1)'}`,
-                                        color: '#e0e0e0', fontSize: '13px',
-                                        fontFamily: 'monospace', outline: 'none',
-                                        boxSizing: 'border-box', marginBottom: '20px',
-                                    }}
-                                />
+                                        <a
+                                            href={`https://t.me/${connectionStates?.telegram?.flowsyncBotUsername || 'FlowSyncBot'}`}
+                                            target="_blank" rel="noopener noreferrer"
+                                            style={{
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                                                padding: '12px', marginBottom: '16px',
+                                                background: 'rgba(0,136,204,0.1)',
+                                                border: '1px solid rgba(0,136,204,0.3)',
+                                                color: '#0099DD', fontSize: '13px', fontWeight: 700,
+                                                textDecoration: 'none', letterSpacing: '0.02em',
+                                                transition: 'all 0.15s',
+                                            }}
+                                            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(0,136,204,0.2)'; }}
+                                            onMouseLeave={e => { e.currentTarget.style.background = 'rgba(0,136,204,0.1)'; }}
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13" /><path d="M22 2L15 22l-4-9-9-4L22 2z" /></svg>
+                                            Open FlowSync Bot on Telegram
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+                                        </a>
 
-                                {/* Connect button */}
-                                <button
-                                    onClick={handleSaveTelegram}
-                                    disabled={!tgBotToken.trim() || tgSaving}
-                                    style={{
-                                        width: '100%', padding: '12px',
-                                        background: tgBotToken.trim() ? '#0088CC' : 'rgba(255,255,255,0.06)',
-                                        border: 'none',
-                                        cursor: tgBotToken.trim() ? 'pointer' : 'not-allowed',
-                                        color: tgBotToken.trim() ? '#fff' : 'rgba(255,255,255,0.25)',
-                                        fontSize: '13px', fontWeight: 700,
-                                        letterSpacing: '0.06em', textTransform: 'uppercase',
-                                        fontFamily: 'inherit',
-                                    }}
-                                >
-                                    {tgSaving ? 'Connecting…' : 'Connect Bot'}
-                                </button>
+                                        {/* Chat ID input (optional, for linking) */}
+                                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '8px' }}>
+                                            TELEGRAM CHAT ID <span style={{ opacity: 0.5, textTransform: 'lowercase', fontWeight: 400 }}>(from /start message)</span>
+                                        </div>
+                                        <input
+                                            type="text"
+                                            placeholder="e.g. 5419951430"
+                                            id="tgChatIdInput"
+                                            style={{
+                                                width: '100%', padding: '11px 14px',
+                                                background: 'rgba(255,255,255,0.04)',
+                                                border: '1px solid rgba(255,255,255,0.1)',
+                                                color: '#e0e0e0', fontSize: '13px',
+                                                fontFamily: 'monospace', outline: 'none',
+                                                boxSizing: 'border-box', marginBottom: '16px',
+                                            }}
+                                        />
+
+                                        <button
+                                            onClick={() => {
+                                                const chatId = document.getElementById('tgChatIdInput')?.value?.trim();
+                                                if (chatId) {
+                                                    setTgSaving(true);
+                                                    socketRef.current?.emit('connect_flowsync_bot', { chatId });
+                                                } else {
+                                                    handleConnectFlowSyncBot();
+                                                }
+                                            }}
+                                            disabled={tgSaving}
+                                            style={{
+                                                width: '100%', padding: '12px',
+                                                background: '#0088CC',
+                                                border: 'none', cursor: 'pointer',
+                                                color: '#fff', fontSize: '13px', fontWeight: 700,
+                                                letterSpacing: '0.06em', textTransform: 'uppercase',
+                                                fontFamily: 'inherit',
+                                                transition: 'opacity 0.15s',
+                                            }}
+                                        >
+                                            {tgSaving ? 'Connecting…' : 'Connect FlowSync Bot'}
+                                        </button>
+
+                                        {/* Show connected status */}
+                                        {connectionStates?.telegram?.connectedBots?.some(b => b.botId === 'flowsync') && (
+                                            <div style={{
+                                                marginTop: '12px', padding: '10px 14px',
+                                                background: 'rgba(34,197,94,0.08)',
+                                                border: '1px solid rgba(34,197,94,0.2)',
+                                                display: 'flex', alignItems: 'center', gap: '8px',
+                                                fontSize: '12px', color: '#22C55E',
+                                            }}>
+                                                <span style={{ fontSize: '14px' }}>✓</span>
+                                                FlowSync Bot connected
+                                            </div>
+                                        )}
+                                    </>
+                                ) : (
+                                    <>
+                                        {/* Personal Bot Tab */}
+                                        <a
+                                            href="https://t.me/BotFather"
+                                            target="_blank" rel="noopener noreferrer"
+                                            style={{
+                                                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                                                padding: '10px 14px', marginBottom: '20px',
+                                                background: 'rgba(0,136,204,0.08)',
+                                                border: '1px solid rgba(0,136,204,0.2)',
+                                                color: '#0099DD', fontSize: '12px', fontWeight: 600,
+                                                textDecoration: 'none', letterSpacing: '0.02em',
+                                            }}
+                                        >
+                                            <span>① Open @BotFather → /newbot → copy token</span>
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
+                                        </a>
+
+                                        <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '8px' }}>
+                                            BOT TOKEN
+                                        </div>
+                                        <input
+                                            type="text"
+                                            value={tgBotToken}
+                                            onChange={e => setTgBotToken(e.target.value)}
+                                            onKeyDown={e => e.key === 'Enter' && handleSaveTelegram()}
+                                            placeholder="1234567890:ABCDEFghijklmnopqrstuvwxyz"
+                                            autoFocus
+                                            style={{
+                                                width: '100%', padding: '11px 14px',
+                                                background: 'rgba(255,255,255,0.04)',
+                                                border: `1px solid ${tgBotToken.trim() ? 'rgba(0,136,204,0.5)' : 'rgba(255,255,255,0.1)'}`,
+                                                color: '#e0e0e0', fontSize: '13px',
+                                                fontFamily: 'monospace', outline: 'none',
+                                                boxSizing: 'border-box', marginBottom: '20px',
+                                            }}
+                                        />
+
+                                        <button
+                                            onClick={handleSaveTelegram}
+                                            disabled={!tgBotToken.trim() || tgSaving}
+                                            style={{
+                                                width: '100%', padding: '12px',
+                                                background: tgBotToken.trim() ? '#0088CC' : 'rgba(255,255,255,0.06)',
+                                                border: 'none',
+                                                cursor: tgBotToken.trim() ? 'pointer' : 'not-allowed',
+                                                color: tgBotToken.trim() ? '#fff' : 'rgba(255,255,255,0.25)',
+                                                fontSize: '13px', fontWeight: 700,
+                                                letterSpacing: '0.06em', textTransform: 'uppercase',
+                                                fontFamily: 'inherit',
+                                            }}
+                                        >
+                                            {tgSaving ? 'Connecting…' : 'Connect Bot'}
+                                        </button>
+
+                                        {/* Show connected status */}
+                                        {connectionStates?.telegram?.connectedBots?.some(b => b.type === 'personal') && (
+                                            <div style={{
+                                                marginTop: '12px', padding: '10px 14px',
+                                                background: 'rgba(34,197,94,0.08)',
+                                                border: '1px solid rgba(34,197,94,0.2)',
+                                                display: 'flex', alignItems: 'center', gap: '8px',
+                                                fontSize: '12px', color: '#22C55E',
+                                            }}>
+                                                <span style={{ fontSize: '14px' }}>✓</span>
+                                                Personal bot connected: @{connectionStates.telegram.connectedBots.find(b => b.type === 'personal')?.username}
+                                            </div>
+                                        )}
+                                    </>
+                                )}
                             </div>
                         </div>
                     </div>
