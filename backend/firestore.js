@@ -10,13 +10,19 @@
 const admin = require('firebase-admin');
 const path = require('path');
 
-// Initialize Firebase Admin — use service account key
-const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS
-    || path.join(__dirname, 'serviceAccountKey.json');
-
+// Initialize Firebase Admin — supports env var (for cloud) or local file (for dev)
 let db;
 try {
-    const serviceAccount = require(serviceAccountPath);
+    let serviceAccount;
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        // Cloud deployment: parse JSON from environment variable
+        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    } else {
+        // Local dev: load from file
+        const serviceAccountPath = process.env.GOOGLE_APPLICATION_CREDENTIALS
+            || path.join(__dirname, 'serviceAccountKey.json');
+        serviceAccount = require(serviceAccountPath);
+    }
     admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
     });
@@ -24,8 +30,7 @@ try {
     console.log('[Firestore] ✅ Admin SDK initialized');
 } catch (err) {
     console.error('[Firestore] ❌ Failed to initialize:', err.message);
-    console.error('[Firestore] Make sure serviceAccountKey.json exists in backend/');
-    // Create a mock db that logs warnings — app still runs but without persistence
+    console.error('[Firestore] Set FIREBASE_SERVICE_ACCOUNT env var, or place serviceAccountKey.json in backend/');
     db = null;
 }
 
