@@ -470,6 +470,7 @@ app.get('/api/twitter/dms', verifyTokenFromHeader, async (req, res) => {
     if (!conn?.accessToken) return res.status(401).json({ success: false, error: 'Not authenticated' });
 
     try {
+        // Try v2 DM lookup first
         const response = await axios.get(
             'https://api.twitter.com/2/dm_events',
             {
@@ -479,7 +480,17 @@ app.get('/api/twitter/dms', verifyTokenFromHeader, async (req, res) => {
         );
         res.json({ success: true, data: response.data });
     } catch (error) {
-        res.status(500).json({ success: false, error: error.response?.data || error.message });
+        // Fallback to v1.1 DM API
+        try {
+            const legacy = await axios.get(
+                'https://api.twitter.com/1.1/direct_messages/events/list.json',
+                { headers: { Authorization: `Bearer ${conn.accessToken}` } }
+            );
+            res.json({ success: true, data: { data: legacy.data.events || [] } });
+        } catch (legacyErr) {
+            console.error('[Twitter DMs] Both v2 and v1.1 failed:', error.response?.data || error.message);
+            res.status(500).json({ success: false, error: error.response?.data || error.message });
+        }
     }
 });
 
