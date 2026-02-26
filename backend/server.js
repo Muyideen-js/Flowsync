@@ -9,7 +9,7 @@ const http = require('http');
 const { Server } = require('socket.io');
 const admin = require('firebase-admin');
 const tgRegistry = require('./tg-registry');
-const waCloud = require('./whatsapp-cloud');
+const waRegistry = require('./wa-registry');
 const store = require('./firestore');
 
 dotenv.config({ path: path.join(__dirname, '.env') });
@@ -24,6 +24,7 @@ const io = new Server(server, {
 
 // Give registries a reference to io
 tgRegistry.setIO(io);
+waRegistry.setIO(io);
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -59,6 +60,8 @@ async function verifyTokenFromHeader(req, res, next) {
    ───────────────────────────────────────────────────────── */
 async function buildFullStates(userId) {
     const conn = await store.getUserConnections(userId);
+    // For WhatsApp, check if the wa-registry manager is ready (QR-based)
+    const waMgr = waRegistry.get(userId);
     return {
         telegram: {
             connected: !!(conn.telegram?.botToken && conn.telegram?.state === 'ready'),
@@ -66,8 +69,8 @@ async function buildFullStates(userId) {
             firstName: conn.telegram?.botFirstName || null,
         },
         whatsapp: {
-            connected: !!(conn.whatsapp?.accessToken),
-            displayPhone: conn.whatsapp?.displayPhone || null,
+            connected: waMgr.isReady() || conn.whatsapp?.state === 'ready',
+            state: waMgr.state,
         },
         twitter: {
             connected: !!(conn.twitter?.accessToken),
@@ -118,6 +121,16 @@ io.on('connection', async (socket) => {
         }
     }
 
+    // ── Auto-restore WhatsApp if previously connected ──
+    if (connections.whatsapp?.state === 'ready') {
+        const waMgr = waRegistry.get(userId);
+        if (!waMgr.isReady() && !waMgr.isInitializing) {
+            waMgr.start().catch(err => {
+                console.error(`[WA:${userId.substring(0, 8)}] Auto-restore failed:`, err.message);
+            });
+        }
+    }
+
     /* ── get_connection_states — re-sync on demand ── */
     socket.on('get_connection_states', async () => {
         socket.emit('connection_states', await buildFullStates(userId));
@@ -140,21 +153,24 @@ io.on('connection', async (socket) => {
     });
 
     /* ═══════════════════════════════════════════════════════
-       WhatsApp Cloud API Events
+       WhatsApp QR Code Events (whatsapp-web.js)
        ═══════════════════════════════════════════════════════ */
 
-    /* ── connect_whatsapp ── */
-    socket.on('connect_whatsapp', async ({ accessToken, phoneNumberId, wabaId } = {}) => {
-        if (!accessToken || !phoneNumberId) {
-            socket.emit('wa_error', { error: 'Missing WhatsApp Cloud API credentials' });
-            return;
-        }
+    /* ── connect_whatsapp — triggers QR code generation ── */
+    socket.on('connect_whatsapp', async () => {
         try {
-            const result = await waCloud.connect(userId, accessToken, phoneNumberId, wabaId);
-            if (result.ok) {
+            const waMgr = waRegistry.get(userId);
+            // Listen for state changes to emit full connection states
+            const onReady = async () => {
                 socket.emit('connection_states', await buildFullStates(userId));
-            } else {
-                socket.emit('wa_error', { error: result.error });
+            };
+            waMgr.removeAllListeners('ready-emitted');
+            waMgr.once('ready-emitted', onReady);
+            // Start will trigger QR → wa_qr event to this user's room
+            await waMgr.start();
+            // If already ready, emit states immediately
+            if (waMgr.isReady()) {
+                socket.emit('connection_states', await buildFullStates(userId));
             }
         } catch (err) {
             socket.emit('wa_error', { error: err.message });
@@ -166,11 +182,18 @@ io.on('connection', async (socket) => {
         socket.emit('connection_states', await buildFullStates(userId));
     });
 
-    /* ── get_whatsapp_chats ── */
+    /* ── get_whatsapp_chats — fetch via wwebjs or Firestore ── */
     socket.on('get_whatsapp_chats', async () => {
         try {
-            const threads = await waCloud.getThreads(userId);
-            socket.emit('whatsapp_chats', threads);
+            const waMgr = waRegistry.get(userId);
+            if (waMgr.isReady()) {
+                const threads = await waMgr.fetchChats(socket);
+                socket.emit('whatsapp_chats', threads);
+            } else {
+                // Fallback to Firestore if session not active
+                const threads = await store.getInbox(userId, 'whatsapp');
+                socket.emit('whatsapp_chats', threads);
+            }
         } catch (err) {
             socket.emit('whatsapp_chats_error', { reason: 'fetch_failed', message: err.message });
         }
@@ -179,8 +202,14 @@ io.on('connection', async (socket) => {
     /* ── send_whatsapp_message ── */
     socket.on('send_whatsapp_message', async ({ chatId, text }) => {
         try {
-            const phoneNumber = waCloud.chatIdToPhoneNumber(chatId);
-            await waCloud.sendMessage(userId, phoneNumber, text);
+            const waMgr = waRegistry.get(userId);
+            await waMgr.sendMessage(chatId, text);
+            // Save outgoing message to Firestore
+            await store.saveMessage(userId, chatId, {
+                text,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                incoming: false,
+            });
             socket.emit('send_message_ok', { chatId });
         } catch (err) {
             socket.emit('send_message_error', { chatId, error: err.message });
@@ -189,7 +218,7 @@ io.on('connection', async (socket) => {
 
     /* ── disconnect_whatsapp ── */
     socket.on('disconnect_whatsapp', async () => {
-        await waCloud.disconnect(userId);
+        await waRegistry.reset(userId);
         socket.emit('connection_states', await buildFullStates(userId));
     });
 
@@ -275,48 +304,7 @@ io.on('connection', async (socket) => {
     });
 });
 
-/* ─────────────────────────────────────────────────────────
-   WhatsApp Cloud API Webhook
-   ───────────────────────────────────────────────────────── */
-app.get('/api/whatsapp/webhook', (req, res) => {
-    const mode = req.query['hub.mode'];
-    const token = req.query['hub.verify_token'];
-    const challenge = req.query['hub.challenge'];
-    if (mode === 'subscribe' && token === waCloud.getVerifyToken()) {
-        console.log('[WA Webhook] Verified');
-        res.status(200).send(challenge);
-    } else {
-        res.sendStatus(403);
-    }
-});
-
-app.post('/api/whatsapp/webhook', async (req, res) => {
-    res.sendStatus(200); // Always respond immediately
-    try {
-        const messages = await waCloud.processWebhookPayload(req.body, io);
-        for (const msg of messages) {
-            // TODO: In multi-user mode, look up which user owns msg.phoneNumberId
-            // For now, broadcast to all connected sockets
-            // Save to Firestore for ALL users who have this phoneNumberId connected
-            // This is a simplified single-user approach:
-            const chatId = msg.chatId;
-            const avatar = (msg.name || '?').substring(0, 2).toUpperCase();
-            const time = msg.time;
-
-            // Broadcast the incoming message
-            io.emit('whatsapp_message', {
-                chatId,
-                from: msg.from,
-                name: msg.name,
-                text: msg.text,
-                time,
-                incoming: true,
-            });
-        }
-    } catch (err) {
-        console.error('[WA Webhook] Error:', err.message);
-    }
-});
+/* WhatsApp Cloud API webhooks removed — using QR-based whatsapp-web.js */
 
 /* ─────────────────────────────────────────────────────────
    Twitter OAuth 2.0 — Per-User with DM Scopes

@@ -12,6 +12,8 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const path = require('path');
 const EventEmitter = require('events');
 const fs = require('fs');
+const QRCode = require('qrcode');
+const store = require('./firestore');
 const { execSync } = require('child_process');
 
 const AUTH_DATA_PATH = path.join(__dirname, '.wwebjs_auth');
@@ -116,10 +118,16 @@ class UserWAManager extends EventEmitter {
             },
         });
 
-        this.client.on('qr', (qr) => {
+        this.client.on('qr', async (qr) => {
             this.lastQr = qr;
             this._setState('qr');
-            this.io.to(this.userId).emit('qr_code', qr);
+            // Convert QR string to base64 data URL for the frontend
+            try {
+                const qrDataUrl = await QRCode.toDataURL(qr, { width: 280, margin: 2 });
+                this.io.to(this.userId).emit('wa_qr', qrDataUrl);
+            } catch (e) {
+                this.io.to(this.userId).emit('wa_qr', qr); // fallback: raw string
+            }
         });
 
         this.client.on('authenticated', () => {
@@ -128,10 +136,15 @@ class UserWAManager extends EventEmitter {
             this.io.to(this.userId).emit('whatsapp_authenticated');
         });
 
-        this.client.on('ready', () => {
+        this.client.on('ready', async () => {
             this.isInitializing = false;
             this.lastQr = null;
             this._setState('ready');
+            // Persist connection state in Firestore
+            await store.setConnection(this.userId, 'whatsapp', {
+                state: 'ready',
+                connectedAt: new Date().toISOString(),
+            });
             this.io.to(this.userId).emit('whatsapp_ready');
         });
 
@@ -152,22 +165,41 @@ class UserWAManager extends EventEmitter {
             this.io.to(this.userId).emit('whatsapp_disconnected');
         });
 
-        // Only incoming messages — 'message' event fires for messages received, not sent
+        // Incoming messages — save to Firestore + emit to frontend
         this.client.on('message', async (msg) => {
             try {
                 const chat = await msg.getChat();
                 const contact = await msg.getContact();
-                this.io.to(this.userId).emit('whatsapp_message', {
+                const name = contact.name || contact.pushname || contact.number;
+                const time = new Date(msg.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const chatId = chat.id._serialized;
+                const messageData = {
                     id: msg.id.id,
                     text: msg.body,
                     from: contact.number,
-                    name: contact.name || contact.pushname || contact.number,
+                    name,
                     incoming: !msg.fromMe,
-                    time: new Date(msg.timestamp * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    chatId: chat.id._serialized,
+                    time,
+                    chatId,
+                };
+
+                // Save to Firestore
+                await store.saveThread(this.userId, chatId, {
+                    platform: 'whatsapp',
+                    name,
+                    avatar: name.substring(0, 2).toUpperCase(),
                 });
+                await store.saveMessage(this.userId, chatId, {
+                    id: msg.id.id,
+                    text: msg.body || '(media)',
+                    time,
+                    incoming: !msg.fromMe,
+                });
+
+                // Emit to frontend
+                this.io.to(this.userId).emit('whatsapp_message', messageData);
             } catch (e) {
-                console.warn(`[WA:${this.userId.substring(0, 8)}] message_create error:`, e.message);
+                console.warn(`[WA:${this.userId.substring(0, 8)}] message error:`, e.message);
             }
         });
 
@@ -205,6 +237,7 @@ class UserWAManager extends EventEmitter {
         this.isInitializing = false;
         this.lastQr = null;
         this._setState('idle');
+        await store.deleteConnection(this.userId, 'whatsapp');
         this.io.to(this.userId).emit('whatsapp_disconnected');
     }
 

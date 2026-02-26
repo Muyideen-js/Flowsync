@@ -57,9 +57,8 @@ const Accounts = () => {
     const [tgSaving, setTgSaving] = useState(false);
 
     const [waModal, setWaModal] = useState(false);
-    const [waAccessToken, setWaAccessToken] = useState('');
-    const [waPhoneNumberId, setWaPhoneNumberId] = useState('');
-    const [waWabaId, setWaWabaId] = useState('');
+    const [waQr, setWaQr] = useState(null);
+    const [waState, setWaState] = useState('idle');
     const [waSaving, setWaSaving] = useState(false);
 
     const socketRef = useRef(null);
@@ -103,15 +102,39 @@ const Accounts = () => {
             setWaSaving(false);
             alert(`WhatsApp error: ${error}`);
         };
+        const onWaQr = (qrDataUrl) => {
+            setWaQr(qrDataUrl);
+            setWaState('qr');
+            setWaSaving(false);
+        };
+        const onWaState = ({ state }) => {
+            setWaState(state);
+            if (state === 'ready') {
+                setWaModal(false);
+                setWaQr(null);
+            }
+        };
+        const onWaReady = () => {
+            setWaState('ready');
+            setWaModal(false);
+            setWaQr(null);
+            setWaSaving(false);
+        };
 
         sharedSocket.on('tg_connected', onTgConnected);
         sharedSocket.on('tg_error', onTgError);
         sharedSocket.on('wa_error', onWaError);
+        sharedSocket.on('wa_qr', onWaQr);
+        sharedSocket.on('wa_state', onWaState);
+        sharedSocket.on('whatsapp_ready', onWaReady);
 
         return () => {
             sharedSocket.off('tg_connected', onTgConnected);
             sharedSocket.off('tg_error', onTgError);
             sharedSocket.off('wa_error', onWaError);
+            sharedSocket.off('wa_qr', onWaQr);
+            sharedSocket.off('wa_state', onWaState);
+            sharedSocket.off('whatsapp_ready', onWaReady);
         };
     }, [sharedSocket]);
 
@@ -134,29 +157,14 @@ const Accounts = () => {
     /* ── Handlers ─────────────────────────────────────────── */
     const handleConnectWA = useCallback(() => {
         setWaModal(true);
-    }, []);
-
-    const handleSaveWA = useCallback(async () => {
-        if (!waAccessToken.trim() || !waPhoneNumberId.trim()) {
-            alert('Please enter your Access Token and Phone Number ID.');
-            return;
-        }
+        setWaQr(null);
+        setWaState('idle');
         setWaSaving(true);
         const socket = socketRef.current;
         if (socket?.connected) {
-            socket.emit('connect_whatsapp', {
-                accessToken: waAccessToken.trim(),
-                phoneNumberId: waPhoneNumberId.trim(),
-                wabaId: waWabaId.trim() || null,
-            });
+            socket.emit('connect_whatsapp');
         }
-        // The connection_states event from backend will update connectionStates
-        // Close modal after a brief delay for UX
-        setTimeout(() => {
-            setWaSaving(false);
-            setWaModal(false);
-        }, 2000);
-    }, [waAccessToken, waPhoneNumberId, waWabaId]);
+    }, []);
 
     const handleConnectTelegram = useCallback(() => {
         setTgModal(true);
@@ -337,10 +345,10 @@ const Accounts = () => {
                     </div>
                 )}
 
-                {/* ════ WhatsApp Cloud API Modal ════ */}
+                {/* ════ WhatsApp QR Code Modal ════ */}
                 {waModal && (
                     <div
-                        onClick={() => setWaModal(false)}
+                        onClick={() => { setWaModal(false); setWaQr(null); }}
                         style={{
                             position: 'fixed', inset: 0, zIndex: 1000,
                             background: 'rgba(0,0,0,0.75)',
@@ -352,26 +360,27 @@ const Accounts = () => {
                         <div
                             onClick={e => e.stopPropagation()}
                             style={{
-                                width: '100%', maxWidth: '420px',
-                                background: 'rgba(8,14,24,0.97)',
-                                border: '1px solid rgba(37,211,102,0.2)',
-                                boxShadow: '0 24px 48px rgba(0,0,0,0.6)',
+                                width: '100%', maxWidth: '380px',
+                                background: 'rgba(8, 14, 24, 0.96)',
+                                border: '1px solid rgba(37,211,102,0.25)',
+                                boxShadow: '0 0 60px rgba(37,211,102,0.12), 0 24px 48px rgba(0,0,0,0.6)',
+                                padding: '0',
                                 overflow: 'hidden',
                                 animation: 'tgSlideUp 0.28s cubic-bezier(0.16,1,0.3,1)',
                                 position: 'relative',
                             }}
                         >
-                            {/* Green accent bar */}
+                            {/* Top accent bar */}
                             <div style={{ height: '3px', background: '#25D366' }} />
 
                             {/* Close */}
                             <button
-                                onClick={() => setWaModal(false)}
+                                onClick={() => { setWaModal(false); setWaQr(null); }}
                                 style={{
                                     position: 'absolute', top: '16px', right: '16px',
                                     background: 'none', border: 'none', cursor: 'pointer',
-                                    color: 'rgba(255,255,255,0.3)', padding: '4px', display: 'flex',
-                                    transition: 'color 0.15s',
+                                    color: 'rgba(255,255,255,0.3)', padding: '4px',
+                                    display: 'flex', transition: 'color 0.15s',
                                 }}
                                 onMouseEnter={e => e.currentTarget.style.color = '#fff'}
                                 onMouseLeave={e => e.currentTarget.style.color = 'rgba(255,255,255,0.3)'}
@@ -390,107 +399,48 @@ const Accounts = () => {
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#25D366" strokeWidth="1.8"><path d="M3 21l1.5-5.5A9 9 0 1116.5 19L3 21z" /></svg>
                                 </div>
                                 <div>
-                                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>WhatsApp Cloud API</div>
-                                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', marginTop: '1px' }}>Enter your Meta Cloud API credentials</div>
+                                    <div style={{ fontSize: '15px', fontWeight: 700, color: '#fff', letterSpacing: '-0.02em' }}>WhatsApp</div>
+                                    <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.35)', marginTop: '1px' }}>Scan QR code with your phone</div>
                                 </div>
                             </div>
 
                             <div style={{ height: '1px', background: 'rgba(255,255,255,0.05)', margin: '0 28px' }} />
 
                             {/* Body */}
-                            <div style={{ padding: '20px 28px 24px' }}>
-                                <a
-                                    href="https://developers.facebook.com/apps/"
-                                    target="_blank" rel="noopener noreferrer"
-                                    style={{
-                                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                        padding: '10px 14px', marginBottom: '20px',
-                                        background: 'rgba(37,211,102,0.08)',
-                                        border: '1px solid rgba(37,211,102,0.2)',
-                                        color: '#25D366', fontSize: '12px', fontWeight: 600,
-                                        textDecoration: 'none', letterSpacing: '0.02em',
-                                    }}
-                                >
-                                    <span>Get credentials from Meta Developer Portal</span>
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /><polyline points="15 3 21 3 21 9" /><line x1="10" y1="14" x2="21" y2="3" /></svg>
-                                </a>
-
-                                {/* Access Token */}
-                                <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '8px' }}>
-                                    ACCESS TOKEN
-                                </div>
-                                <input
-                                    type="text"
-                                    value={waAccessToken}
-                                    onChange={e => setWaAccessToken(e.target.value)}
-                                    placeholder="EAAxxxxxxx..."
-                                    autoFocus
-                                    style={{
-                                        width: '100%', padding: '11px 14px',
-                                        background: 'rgba(255,255,255,0.04)',
-                                        border: `1px solid ${waAccessToken.trim() ? 'rgba(37,211,102,0.5)' : 'rgba(255,255,255,0.1)'}`,
-                                        color: '#e0e0e0', fontSize: '13px',
-                                        fontFamily: 'monospace', outline: 'none',
-                                        boxSizing: 'border-box', marginBottom: '16px',
-                                    }}
-                                />
-
-                                {/* Phone Number ID */}
-                                <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '8px' }}>
-                                    PHONE NUMBER ID
-                                </div>
-                                <input
-                                    type="text"
-                                    value={waPhoneNumberId}
-                                    onChange={e => setWaPhoneNumberId(e.target.value)}
-                                    placeholder="1027459597111064"
-                                    style={{
-                                        width: '100%', padding: '11px 14px',
-                                        background: 'rgba(255,255,255,0.04)',
-                                        border: `1px solid ${waPhoneNumberId.trim() ? 'rgba(37,211,102,0.5)' : 'rgba(255,255,255,0.1)'}`,
-                                        color: '#e0e0e0', fontSize: '13px',
-                                        fontFamily: 'monospace', outline: 'none',
-                                        boxSizing: 'border-box', marginBottom: '16px',
-                                    }}
-                                />
-
-                                {/* WABA ID (optional) */}
-                                <div style={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: '8px' }}>
-                                    WABA ID <span style={{ opacity: 0.4, fontWeight: 400 }}>(optional)</span>
-                                </div>
-                                <input
-                                    type="text"
-                                    value={waWabaId}
-                                    onChange={e => setWaWabaId(e.target.value)}
-                                    placeholder="1588002115757208"
-                                    style={{
-                                        width: '100%', padding: '11px 14px',
-                                        background: 'rgba(255,255,255,0.04)',
-                                        border: `1px solid rgba(255,255,255,0.1)`,
-                                        color: '#e0e0e0', fontSize: '13px',
-                                        fontFamily: 'monospace', outline: 'none',
-                                        boxSizing: 'border-box', marginBottom: '20px',
-                                    }}
-                                />
-
-                                {/* Connect button */}
-                                <button
-                                    onClick={handleSaveWA}
-                                    disabled={!waAccessToken.trim() || !waPhoneNumberId.trim() || waSaving}
-                                    style={{
-                                        width: '100%', padding: '12px',
-                                        background: (waAccessToken.trim() && waPhoneNumberId.trim())
-                                            ? '#25D366' : 'rgba(255,255,255,0.06)',
-                                        border: 'none',
-                                        cursor: (waAccessToken.trim() && waPhoneNumberId.trim()) ? 'pointer' : 'not-allowed',
-                                        color: (waAccessToken.trim() && waPhoneNumberId.trim()) ? '#fff' : 'rgba(255,255,255,0.25)',
-                                        fontSize: '13px', fontWeight: 700,
-                                        letterSpacing: '0.06em', textTransform: 'uppercase',
-                                        fontFamily: 'inherit',
-                                    }}
-                                >
-                                    {waSaving ? 'Connecting…' : 'Connect WhatsApp'}
-                                </button>
+                            <div style={{ padding: '24px 28px 28px', textAlign: 'center' }}>
+                                {waQr ? (
+                                    <>
+                                        <div style={{
+                                            background: '#fff', borderRadius: '12px', padding: '16px',
+                                            display: 'inline-block', marginBottom: '16px',
+                                        }}>
+                                            <img src={waQr} alt="WhatsApp QR Code" style={{ width: '240px', height: '240px', display: 'block' }} />
+                                        </div>
+                                        <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', lineHeight: 1.6 }}>
+                                            Open <strong style={{ color: '#25D366' }}>WhatsApp</strong> on your phone<br />
+                                            Go to <strong>Settings → Linked Devices → Link a Device</strong><br />
+                                            Point your camera at this QR code
+                                        </div>
+                                    </>
+                                ) : waState === 'ready' ? (
+                                    <div style={{ padding: '40px 0' }}>
+                                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#25D366" strokeWidth="2" strokeLinecap="round"><path d="M20 6L9 17l-5-5" /></svg>
+                                        <div style={{ fontSize: '14px', color: '#25D366', fontWeight: 600, marginTop: '12px' }}>Connected!</div>
+                                    </div>
+                                ) : (
+                                    <div style={{ padding: '40px 0' }}>
+                                        <div style={{
+                                            width: '32px', height: '32px', margin: '0 auto 16px',
+                                            border: '3px solid rgba(37,211,102,0.2)',
+                                            borderTopColor: '#25D366',
+                                            borderRadius: '50%',
+                                            animation: 'spin 0.8s linear infinite',
+                                        }} />
+                                        <div style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)' }}>
+                                            {waState === 'authenticated' ? 'Syncing session…' : waState === 'restoring' ? 'Restoring session…' : 'Initializing…'}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -623,6 +573,7 @@ const Accounts = () => {
                 <style>{`
                     @keyframes tgFadeIn { from { opacity: 0 } to { opacity: 1 } }
                     @keyframes tgSlideUp { from { opacity: 0; transform: translateY(20px) scale(0.97) } to { opacity: 1; transform: translateY(0) scale(1) } }
+                    @keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }
                 `}</style>
 
             </div>
