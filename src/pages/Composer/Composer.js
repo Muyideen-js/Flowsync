@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import MainLayout from '../../components/Layout/MainLayout';
+import { useAuth } from '../../contexts/AuthContext';
+import twitterService from '../../services/twitterService';
 import './Composer.css';
 
 /* ── Inline SVG icons — no emojis ── */
@@ -77,6 +79,7 @@ const generateVariations = (content, tone, goal, audience, keywords) => {
 };
 
 const Composer = () => {
+    const { user } = useAuth();
     const [loaded, setLoaded] = useState(false);
     const [content, setContent] = useState('');
     const [selectedChannels, setSelectedChannels] = useState(['instagram']);
@@ -94,6 +97,7 @@ const Composer = () => {
     const [keywords, setKeywords] = useState('');
     const [showPreview, setShowPreview] = useState(false);
     const [publishedToast, setPublishedToast] = useState('');
+    const [publishing, setPublishing] = useState(false);
     const [activeTab, setActiveTab] = useState('write');
 
     useEffect(() => { requestAnimationFrame(() => setLoaded(true)); }, []);
@@ -143,12 +147,44 @@ const Composer = () => {
         setTimeout(() => setCopiedId(null), 2000);
     }, []);
 
-    const handlePublish = useCallback(() => {
-        if (!content.trim() || selectedChannels.length === 0) return;
-        const labels = selectedChannels.map(c => channelOptions.find(o => o.id === c)?.abbr).join(', ');
-        setPublishedToast(`Published to ${labels}`);
-        setTimeout(() => setPublishedToast(''), 3000);
-    }, [content, selectedChannels]);
+    const handlePublish = useCallback(async () => {
+        if (!content.trim() || selectedChannels.length === 0 || publishing) return;
+        setPublishing(true);
+
+        const results = [];
+        const errors = [];
+
+        // Post to X/Twitter if selected
+        if (selectedChannels.includes('twitter')) {
+            try {
+                const token = await user.getIdToken();
+                const res = await twitterService.postTweet(content, token);
+                if (res.success) {
+                    results.push('X');
+                } else {
+                    errors.push(`X: ${res.error || 'Failed'}`);
+                }
+            } catch (err) {
+                errors.push(`X: ${err.response?.data?.error || err.message}`);
+            }
+        }
+
+        // Other platforms — placeholder for future
+        const otherChannels = selectedChannels.filter(c => c !== 'twitter');
+        if (otherChannels.length > 0) {
+            const labels = otherChannels.map(c => channelOptions.find(o => o.id === c)?.abbr).join(', ');
+            results.push(labels + ' (queued)');
+        }
+
+        setPublishing(false);
+
+        if (errors.length > 0) {
+            setPublishedToast(`Error: ${errors.join('; ')}`);
+        } else {
+            setPublishedToast(`Published to ${results.join(', ')}`);
+        }
+        setTimeout(() => setPublishedToast(''), 4000);
+    }, [content, selectedChannels, publishing, user]);
 
     const contentScore = Math.min(
         Math.round(
@@ -252,10 +288,10 @@ const Composer = () => {
                                     </button>
                                     <button
                                         className="cs-btn primary"
-                                        disabled={!content.trim() || selectedChannels.length === 0 || overLimit}
+                                        disabled={!content.trim() || selectedChannels.length === 0 || overLimit || publishing}
                                         onClick={handlePublish}
                                     >
-                                        {Ic.send} <span>Publish</span>
+                                        {Ic.send} <span>{publishing ? 'Publishing…' : 'Publish'}</span>
                                     </button>
                                 </div>
                             </div>
@@ -435,7 +471,7 @@ const Composer = () => {
                     <div className="cs-toast">{Ic.check} {publishedToast}</div>
                 )}
             </div>
-        </MainLayout>
+        </MainLayout >
     );
 };
 
