@@ -528,8 +528,8 @@ const Accounts = () => {
                                 borderBottom: '1px solid rgba(255,255,255,0.06)',
                             }}>
                                 {[
-                                    { key: 'flowsync', label: '⚡ FlowSync Bot', sub: 'Official bot' },
-                                    { key: 'personal', label: '🧱 Personal Bot', sub: 'Your own bot' },
+                                    { key: 'flowsync', label: 'FlowSync Bot', sub: 'Official bot' },
+                                    { key: 'personal', label: 'Personal Bot', sub: 'Your own bot' },
                                 ].map(tab => (
                                     <button
                                         key={tab.key}

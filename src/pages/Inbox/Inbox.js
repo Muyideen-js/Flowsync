@@ -450,8 +450,8 @@ const Inbox = () => {
                         }}>
                             {[
                                 { key: 'all', label: 'All' },
-                                { key: 'flowsync', label: '⚡ FlowSync' },
-                                { key: 'personal', label: '🧱 Personal' },
+                                { key: 'flowsync', label: 'FlowSync' },
+                                { key: 'personal', label: 'Personal' },
                             ].map(tab => (
                                 <button
                                     key={tab.key}
